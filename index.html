@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RT 02/RW 014 — Griya Satwika Telkom</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#1B5E20;--primary-light:#2E7D32;--primary-dark:#0D3B13;--accent:#FFD700;--bg:#F0F2F5;--card:#FFF;--text:#1a1a2e;--text-light:#6c757d;--danger:#DC3545;--success:#28A745;--warning:#FFC107;--info:#17A2B8;--check:#28A745;--cross:#DC3545;--yellow:#FFF9C4;--border:#dee2e6;--shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -122,6 +123,21 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
 .footer{text-align:center;padding:18px;font-size:.78em;color:var(--text-light);border-top:1px solid var(--border);margin-top:20px}
 .hidden{display:none!important}
 
+/* DASHBOARD CHARTS */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.chart-card{background:var(--card);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.chart-card h4{font-size:.9em;color:var(--primary);margin-bottom:12px;font-weight:700}
+.chart-container{position:relative;width:100%;max-height:280px}
+.big-stat{text-align:center;padding:20px;background:var(--card);border-radius:14px;box-shadow:var(--shadow)}
+.big-stat .icon{font-size:2em;margin-bottom:6px}
+.big-stat .value{font-size:1.8em;font-weight:800;margin-bottom:2px}
+.big-stat .label{font-size:.78em;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px}
+.big-stat.positive .value{color:var(--success)}
+.big-stat.negative .value{color:var(--danger)}
+.big-stat.info .value{color:var(--info)}
+.big-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+@media(max-width:700px){.chart-grid{grid-template-columns:1fr}.big-stats{grid-template-columns:1fr}}
+
 /* RESPONSIVE */
 @media(max-width:600px){
   .stats{grid-template-columns:1fr 1fr}
@@ -208,12 +224,64 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
   </div>
 
   <div class="nav" id="nav">
-    <button class="active" onclick="showTab('iuran')">📊 Rekap Iuran</button>
+    <button class="active" onclick="showTab('dashboard')">🏠 Dashboard</button>
+    <button onclick="showTab('iuran')">📊 Rekap Iuran</button>
     <button onclick="showTab('keuangan')">💰 Keuangan</button>
     <button onclick="showTab('laporan')">📋 Laporan</button>
   </div>
 
   <div class="container">
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard">
+      <div class="big-stats">
+        <div class="big-stat positive">
+          <div class="icon">💰</div>
+          <div class="value" id="dash-kas">Rp 0</div>
+          <div class="label">Saldo Kas RT</div>
+        </div>
+        <div class="big-stat info">
+          <div class="icon">👥</div>
+          <div class="value" id="dash-warga">0/0</div>
+          <div class="label">Warga Bayar / Total</div>
+        </div>
+        <div class="big-stat negative">
+          <div class="icon">📋</div>
+          <div class="value" id="dash-tunggakan">Rp 0</div>
+          <div class="label">Total Tunggakan</div>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h4>📊 Status Pembayaran Iuran</h4>
+          <div class="chart-container">
+            <canvas id="chart-pie"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>📈 Pemasukan vs Pengeluaran per Bulan</h4>
+          <div class="chart-container">
+            <canvas id="chart-bar"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h4>💵 Arus Kas per Bulan</h4>
+          <div class="chart-container">
+            <canvas id="chart-cashflow"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>🏆 Top 10 Warga Bayar Terbanyak</h4>
+          <div class="chart-container">
+            <canvas id="chart-top"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- REKAP IURAN -->
     <div id="tab-iuran">
@@ -472,7 +540,7 @@ function enterApp(){
   // Hide admin-only elements for warga
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
 
-  renderTabel();
+  renderDashboard();
 }
 
 // ==================== HELPERS ====================
@@ -485,11 +553,162 @@ function isPaid(idx,bulan){const w=DB.warga[idx];return w&&w.bayar&&w.bayar[bula
 function getTotalBayar(idx){const w=DB.warga[idx];if(!w||!w.bayar)return 0;return Object.values(w.bayar).filter(v=>v===1).length}
 
 function showTab(t){
-  ['iuran','keuangan','laporan'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
-  document.querySelectorAll('.nav button').forEach((b,i)=>b.classList.toggle('active',['iuran','keuangan','laporan'][i]===t));
+  ['dashboard','iuran','keuangan','laporan'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  document.querySelectorAll('.nav button').forEach((b,i)=>b.classList.toggle('active',['dashboard','iuran','keuangan','laporan'][i]===t));
+  if(t==='dashboard')renderDashboard();
   if(t==='iuran')renderTabel();
   if(t==='keuangan')renderKeuangan();
   if(t==='laporan')renderLaporan();
+}
+
+// ==================== DASHBOARD ====================
+let chartPie, chartBar, chartCashflow, chartTop;
+
+function renderDashboard(){
+  const totalWarga = DB.warga.length;
+  const totalKosong = DB.warga.filter(w=>w.kosong).length;
+  const totalAktif = totalWarga - totalKosong;
+  const sudahBayar = DB.warga.filter((w,i)=>getTotalBayar(i)>0&&!w.kosong).length;
+  const belumBayar = totalAktif - sudahBayar;
+  const lunas = DB.warga.filter((w,i)=>getTotalBayar(i)>=6&&!w.kosong).length;
+  const belumLunas = sudahBayar - lunas;
+
+  const totalIuran = DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
+  const totalMasuk = DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
+  const totalKeluar = DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
+  const saldoKas = totalIuran + totalMasuk - totalKeluar;
+  const totalTunggakan = totalWarga*6*IURAN - totalIuran;
+
+  // Big stats
+  document.getElementById('dash-kas').textContent = rp(saldoKas);
+  document.getElementById('dash-warga').textContent = sudahBayar + '/' + totalAktif;
+  document.getElementById('dash-tunggakan').textContent = rp(totalTunggakan);
+
+  // PIE CHART - Status Pembayaran
+  const pieCtx = document.getElementById('chart-pie').getContext('2d');
+  if(chartPie) chartPie.destroy();
+  chartPie = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Lunas (6 bulan)', 'Bayar Sebagian', 'Belum Bayar', 'Rumah Kosong'],
+      datasets: [{
+        data: [lunas, belumLunas, belumBayar, totalKosong],
+        backgroundColor: ['#28A745', '#FFC107', '#DC3545', '#adb5bd'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+              const pct = Math.round(ctx.raw/total*100);
+              return ctx.label + ': ' + ctx.raw + ' warga (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // BAR CHART - Pemasukan vs Pengeluaran per Bulan
+  const barCtx = document.getElementById('chart-bar').getContext('2d');
+  if(chartBar) chartBar.destroy();
+  const pemasukanBulanan = [];
+  const pengeluaranBulanan = [];
+  for(let m=1;m<=12;m++){
+    const iuran = DB.warga.filter((w,i)=>isPaid(i,m)).length * IURAN;
+    const masukLain = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    pemasukanBulanan.push(iuran + masukLain);
+    pengeluaranBulanan.push(keluar);
+  }
+  chartBar = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: BLN,
+      datasets: [
+        { label: 'Pemasukan', data: pemasukanBulanan, backgroundColor: 'rgba(40,167,69,.7)', borderRadius: 6 },
+        { label: 'Pengeluaran', data: pengeluaranBulanan, backgroundColor: 'rgba(220,53,69,.7)', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => 'Rp ' + (v/1000000).toFixed(1) + 'jt' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // LINE CHART - Arus Kas
+  const cashCtx = document.getElementById('chart-cashflow').getContext('2d');
+  if(chartCashflow) chartCashflow.destroy();
+  const saldoBulanan = [];
+  let saldoRunning = 0;
+  for(let m=1;m<=12;m++){
+    saldoRunning += pemasukanBulanan[m-1] - pengeluaranBulanan[m-1];
+    saldoBulanan.push(saldoRunning);
+  }
+  chartCashflow = new Chart(cashCtx, {
+    type: 'line',
+    data: {
+      labels: BLN,
+      datasets: [{
+        label: 'Saldo Kas',
+        data: saldoBulanan,
+        borderColor: '#17A2B8',
+        backgroundColor: 'rgba(23,162,184,.1)',
+        fill: true,
+        tension: .3,
+        pointRadius: 5,
+        pointBackgroundColor: '#17A2B8'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => 'Rp ' + (v/1000000).toFixed(1) + 'jt' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // BAR CHART - Top 10 Warga
+  const topCtx = document.getElementById('chart-top').getContext('2d');
+  if(chartTop) chartTop.destroy();
+  const wargaSorted = DB.warga.map((w,i)=>({nama:w.nama, total:getTotalBayar(i)})).filter(w=>w.total>0).sort((a,b)=>b.total-a.total).slice(0,10);
+  chartTop = new Chart(topCtx, {
+    type: 'bar',
+    data: {
+      labels: wargaSorted.map(w=>w.nama.length>15?w.nama.slice(0,15)+'...':w.nama),
+      datasets: [{
+        label: 'Bulan Dibayar',
+        data: wargaSorted.map(w=>w.total),
+        backgroundColor: wargaSorted.map(w=>w.total>=6?'rgba(40,167,69,.8)':w.total>=3?'rgba(255,193,7,.8)':'rgba(220,53,69,.5)'),
+        borderRadius: 6
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, max: 6, ticks: { stepSize: 1 } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
 }
 
 // ==================== REKAP IURAN ====================
