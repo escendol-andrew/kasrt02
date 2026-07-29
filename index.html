@@ -484,6 +484,22 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
   </div>
 </div>
 
+<!-- MODAL: Edit Transaksi -->
+<div class="modal-overlay" id="modal-edit-tx">
+  <div class="modal">
+    <h3>✏️ Edit Transaksi</h3>
+    <input type="hidden" id="edit-tx-id">
+    <div class="form-group"><label>Jenis</label><select id="edit-tx-jenis"><option value="masuk">📥 Pemasukan</option><option value="keluar">📤 Pengeluaran</option></select></div>
+    <div class="form-group"><label>Keterangan</label><input type="text" id="edit-tx-keterangan" placeholder="Keterangan transaksi"></div>
+    <div class="form-group"><label>Jumlah (Rp)</label><input type="number" id="edit-tx-jumlah" placeholder="200000"></div>
+    <div class="form-group"><label>Tanggal</label><input type="date" id="edit-tx-tanggal"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-tx')">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditTransaksi()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ==================== CONFIG ====================
 const BLN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
@@ -1134,7 +1150,7 @@ function renderJurnalUmum(){
       <td><span class="badge ${isMasuk?'badge-paid':'badge-unpaid'}">${isMasuk?'📥 Masuk':'📤 Keluar'}</span></td>
       <td style="color:var(--success)">${isMasuk?rp(t.jumlah):'—'}</td>
       <td style="color:var(--danger)">${!isMasuk?rp(t.jumlah):'—'}</td>`;
-    if(isAdmin)html+=`<td><button class="btn btn-danger btn-sm" onclick="hapusTransaksi('${t.id}')">🗑️</button></td>`;
+    if(isAdmin)html+=`<td><button class="btn btn-primary btn-sm" onclick="editTransaksi('${t.id}')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapusTransaksi('${t.id}')">🗑️</button></td>`;
     html+=`</tr>`;
   });
   html+=`</tbody></table></div>`;
@@ -1160,6 +1176,33 @@ function savePengeluaran(){
   DB.transaksi.push({id:uid(),jenis:'keluar',keterangan:k,jumlah:j,tanggal:t});
   saveDB(DB);closeModal('modal-transaksi-keluar');renderKeuangan();renderDashboard();renderLaporan();toast('✅ Pengeluaran ditambahkan');
   document.getElementById('tx-keluar-keterangan').value='';document.getElementById('tx-keluar-jumlah').value='';document.getElementById('tx-keluar-tanggal').value='';
+}
+
+function editTransaksi(id){
+  const t=DB.transaksi.find(tx=>tx.id===id);
+  if(!t)return;
+  document.getElementById('edit-tx-id').value=id;
+  document.getElementById('edit-tx-jenis').value=t.jenis;
+  document.getElementById('edit-tx-keterangan').value=t.keterangan||'';
+  document.getElementById('edit-tx-jumlah').value=t.jumlah;
+  document.getElementById('edit-tx-tanggal').value=t.tanggal;
+  openModal('modal-edit-tx');
+}
+
+function saveEditTransaksi(){
+  const id=document.getElementById('edit-tx-id').value;
+  const idx=DB.transaksi.findIndex(t=>t.id===id);
+  if(idx<0)return;
+  const jenis=document.getElementById('edit-tx-jenis').value;
+  const keterangan=document.getElementById('edit-tx-keterangan').value.trim();
+  const jumlah=parseInt(document.getElementById('edit-tx-jumlah').value);
+  const tanggal=document.getElementById('edit-tx-tanggal').value;
+  if(!keterangan||!jumlah||!tanggal){toast('⚠️ Semua field wajib diisi!');return}
+  DB.transaksi[idx]={...DB.transaksi[idx],jenis,keterangan,jumlah,tanggal};
+  saveDB(DB);
+  closeModal('modal-edit-tx');
+  renderKeuangan();renderDashboard();renderLaporan();
+  toast('✅ Transaksi diperbarui');
 }
 
 function hapusTransaksi(id){
