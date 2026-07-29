@@ -233,7 +233,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
   <div class="container">
 
     <!-- DASHBOARD -->
-    <div id="tab-dashboard">
+    <div id="tab-dashboard" class="hidden">
       <div class="big-stats">
         <div class="big-stat positive">
           <div class="icon">💰</div>
@@ -540,7 +540,7 @@ function enterApp(){
   // Hide admin-only elements for warga
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
 
-  renderDashboard();
+  showTab('dashboard');
 }
 
 // ==================== HELPERS ====================
