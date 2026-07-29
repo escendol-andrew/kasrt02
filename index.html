@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RT Finance — Sistem Pelaporan Keuangan RT</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --primary: #1B5E20;
+  --primary-light: #2E7D32;
+  --accent: #FFD700;
+  --bg: #F5F5F5;
+  --card: #FFFFFF;
+  --text: #212121;
+  --text-light: #757575;
+  --danger: #C62828;
+  --success: #2E7D32;
+  --warning: #F57F17;
+  --info: #0277BD;
+}
+body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+.header { background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; padding:20px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,.2); }
+.header h1 { font-size:1.6em; margin-bottom:4px; }
+.header p { opacity:.85; font-size:.9em; }
+.nav { display:flex; background:white; box-shadow:0 1px 3px rgba(0,0,0,.1); overflow-x:auto; scrollbar-width:none; }
+.nav::-webkit-scrollbar { display:none; }
+.nav button { flex:1; min-width:max-content; padding:14px 12px; border:none; background:none; font-size:.85em; font-weight:600; color:var(--text-light); cursor:pointer; transition:.2s; border-bottom:3px solid transparent; white-space:nowrap; }
+.nav button.active { color:var(--primary); border-bottom-color:var(--primary); background:rgba(27,94,32,.04); }
+.container { max-width:900px; margin:0 auto; padding:16px; }
+.card { background:var(--card); border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.card h3 { font-size:1.1em; margin-bottom:12px; color:var(--primary); display:flex; align-items:center; gap:8px; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:20px; }
+.stat-card { background:var(--card); border-radius:12px; padding:20px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.08); border-left:4px solid var(--primary); }
+.stat-card.income { border-left-color:var(--success); }
+.stat-card.expense { border-left-color:var(--danger); }
+.stat-card.cash { border-left-color:var(--info); }
+.stat-card .label { font-size:.8em; color:var(--text-light); text-transform:uppercase; letter-spacing:.5px; }
+.stat-card .amount { font-size:1.6em; font-weight:700; margin:6px 0; }
+.stat-card.income .amount { color:var(--success); }
+.stat-card.expense .amount { color:var(--danger); }
+.stat-card.cash .amount { color:var(--info); }
+table { width:100%; border-collapse:collapse; font-size:.9em; }
+th { background:var(--primary); color:white; padding:10px 12px; text-align:left; font-weight:600; }
+td { padding:10px 12px; border-bottom:1px solid #eee; }
+tr:hover td { background:#f9f9f9; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.75em; font-weight:600; }
+.badge-paid { background:#E8F5E9; color:var(--success); }
+.badge-unpaid { background:#FFEBEE; color:var(--danger); }
+.badge-income { background:#E8F5E9; color:var(--success); }
+.badge-expense { background:#FFEBEE; color:var(--danger); }
+.btn { padding:8px 18px; border:none; border-radius:8px; font-size:.85em; font-weight:600; cursor:pointer; transition:.2s; }
+.btn-primary { background:var(--primary); color:white; }
+.btn-primary:hover { background:var(--primary-light); }
+.btn-danger { background:var(--danger); color:white; }
+.btn-danger:hover { background:#B71C1C; }
+.btn-sm { padding:5px 12px; font-size:.8em; }
+.btn-outline { background:transparent; border:2px solid var(--primary); color:var(--primary); }
+.btn-outline:hover { background:var(--primary); color:white; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:.85em; font-weight:600; margin-bottom:5px; color:var(--text); }
+.form-group input, .form-group select, .form-group textarea { width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:.9em; transition:.2s; }
+.form-group input:focus, .form-group select:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(27,94,32,.1); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:100; justify-content:center; align-items:center; }
+.modal-overlay.show { display:flex; }
+.modal { background:white; border-radius:16px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; }
+.modal h3 { margin-bottom:16px; }
+.empty-state { text-align:center; padding:40px 20px; color:var(--text-light); }
+.empty-state .icon { font-size:3em; margin-bottom:12px; }
+.filter-bar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+.filter-bar select, .filter-bar input { padding:8px 12px; border:1px solid #ddd; border-radius:8px; font-size:.85em; }
+.section-title { font-size:1em; font-weight:700; margin:20px 0 10px; color:var(--primary); }
+.hidden { display:none !important; }
+.progress-bar { height:8px; background:#eee; border-radius:4px; overflow:hidden; margin-top:6px; }
+.progress-fill { height:100%; background:var(--success); border-radius:4px; transition:.3s; }
+.toast { position:fixed; bottom:20px; right:20px; background:var(--primary); color:white; padding:12px 20px; border-radius:8px; font-size:.9em; z-index:200; animation:slideIn .3s; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+@keyframes slideIn { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+@media(max-width:600px) {
+  .stats { grid-template-columns:1fr; }
+  .form-row { grid-template-columns:1fr; }
+  .header h1 { font-size:1.3em; }
+  .nav button { font-size:.78em; padding:12px 8px; }
+  table { font-size:.82em; }
+  th, td { padding:8px 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏘️ RT Finance</h1>
+  <p>Sistem Pelaporan Keuangan RT</p>
+</div>
+
+<div class="nav" id="nav">
+  <button class="active" onclick="showTab('dashboard')">📊 Dashboard</button>
+  <button onclick="showTab('warga')">👥 Data Warga</button>
+  <button onclick="showTab('keuangan')">💰 Keuangan</button>
+  <button onclick="showTab('laporan')">📋 Laporan</button>
+  <button onclick="showTab('settings')">⚙️ Pengaturan</button>
+</div>
+
+<div class="container">
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard">
+    <div class="stats">
+      <div class="stat-card income">
+        <div class="label">Total Pendapatan</div>
+        <div class="amount" id="stat-income">Rp 0</div>
+      </div>
+      <div class="stat-card expense">
+        <div class="label">Total Pengeluaran</div>
+        <div class="amount" id="stat-expense">Rp 0</div>
+      </div>
+      <div class="stat-card cash">
+        <div class="label">Kas Tersedia</div>
+        <div class="amount" id="stat-cash">Rp 0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📈 Status Iuran Bulan Ini</h3>
+      <div id="iuran-status"></div>
+    </div>
+
+    <div class="card">
+      <h3>🕐 Transaksi Terakhir</h3>
+      <div id="recent-transactions"></div>
+    </div>
+  </div>
+
+  <!-- DATA WARGA -->
+  <div id="tab-warga" class="hidden">
+    <div class="card">
+      <h3>👥 Data Warga</h3>
+      <div class="filter-bar">
+        <input type="text" id="search-warga" placeholder="🔍 Cari warga..." oninput="renderWarga()">
+        <select id="filter-status" onchange="renderWarga()">
+          <option value="all">Semua Status</option>
+          <option value="paid">Sudah Bayar</option>
+          <option value="unpaid">Belum Bayar</option>
+        </select>
+        <button class="btn btn-primary" onclick="openModal('modal-warga')">+ Tambah Warga</button>
+      </div>
+      <div id="table-warga"></div>
+    </div>
+  </div>
+
+  <!-- KEUANGAN -->
+  <div id="tab-keuangan" class="hidden">
+    <div class="card">
+      <h3>💰 Catatan Keuangan</h3>
+      <div class="filter-bar">
+        <select id="filter-bulan" onchange="renderKeuangan()">
+          <option value="all">Semua Bulan</option>
+        </select>
+        <select id="filter-jenis" onchange="renderKeuangan()">
+          <option value="all">Semua Jenis</option>
+          <option value="income">Pemasukan</option>
+          <option value="expense">Pengeluaran</option>
+        </select>
+        <button class="btn btn-primary" onclick="openModal('modal-transaksi')">+ Tambah Transaksi</button>
+      </div>
+      <div id="table-keuangan"></div>
+    </div>
+  </div>
+
+  <!-- LAPORAN -->
+  <div id="tab-laporan" class="hidden">
+    <div class="card">
+      <h3>📋 Laporan Keuangan</h3>
+      <div class="form-row" style="margin-bottom:16px;">
+        <div class="form-group">
+          <label>Bulan</label>
+          <select id="laporan-bulan" onchange="generateLaporan()"></select>
+        </div>
+        <div class="form-group">
+          <label>Tahun</label>
+          <select id="laporan-tahun" onchange="generateLaporan()"></select>
+        </div>
+      </div>
+      <div id="laporan-content"></div>
+      <div style="margin-top:16px;text-align:center;">
+        <button class="btn btn-primary" onclick="printLaporan()">🖨️ Cetak Laporan</button>
+        <button class="btn btn-outline" onclick="exportCSV()" style="margin-left:8px;">📥 Export CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PENGATURAN -->
+  <div id="tab-settings" class="hidden">
+    <div class="card">
+      <h3>⚙️ Pengaturan RT</h3>
+      <div class="form-group">
+        <label>Nama RT</label>
+        <input type="text" id="setting-nama-rt" placeholder="Contoh: RT 001/RW 005" onchange="saveSettings()">
+      </div>
+      <div class="form-group">
+        <label>Nama Ketua RT</label>
+        <input type="text" id="setting-ketua" placeholder="Nama ketua RT" onchange="saveSettings()">
+      </div>
+      <div class="form-group">
+        <label>Iuran Bulanan (Rp)</label>
+        <input type="number" id="setting-iuran" placeholder="50000" onchange="saveSettings()">
+      </div>
+      <div class="form-group">
+        <label>Kategori Pengeluaran</label>
+        <textarea id="setting-kategori" rows="4" placeholder="Keamanan&#10;Kebersihan&#10;Infrastruktur&#10;Sosial&#10;Lainnya" onchange="saveSettings()"></textarea>
+      </div>
+      <hr style="margin:20px 0;border:none;border-top:1px solid #eee;">
+      <h3>🗄️ Data Management</h3>
+      <p style="font-size:.85em;color:var(--text-light);margin-bottom:12px;">Backup atau restore data keuangan RT</p>
+      <button class="btn btn-outline" onclick="exportData()">📥 Export Data (JSON)</button>
+      <button class="btn btn-outline" onclick="document.getElementById('import-file').click()" style="margin-left:8px;">📤 Import Data</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+      <br><br>
+      <button class="btn btn-danger btn-sm" onclick="resetData()">🗑️ Reset Semua Data</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: Tambah Warga -->
+<div class="modal-overlay" id="modal-warga">
+  <div class="modal">
+    <h3 id="modal-warga-title">➕ Tambah Warga</h3>
+    <input type="hidden" id="edit-warga-id">
+    <div class="form-group">
+      <label>Nama Lengkap</label>
+      <input type="text" id="warga-nama" placeholder="Nama warga">
+    </div>
+    <div class="form-group">
+      <label>No. Rumah</label>
+      <input type="text" id="warga-rumah" placeholder="Contoh: 01">
+    </div>
+    <div class="form-group">
+      <label>No. HP (opsional)</label>
+      <input type="text" id="warga-hp" placeholder="08xxx">
+    </div>
+    <div class="form-group">
+      <label>Jumlah Jiwa</label>
+      <input type="number" id="warga-jiwa" placeholder="3" value="3" min="1">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeModal('modal-warga')">Batal</button>
+      <button class="btn btn-primary" onclick="saveWarga()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Tambah Transaksi -->
+<div class="modal-overlay" id="modal-transaksi">
+  <div class="modal">
+    <h3>➕ Tambah Transaksi</h3>
+    <div class="form-group">
+      <label>Jenis</label>
+      <select id="tx-jenis">
+        <option value="income">📥 Pemasukan</option>
+        <option value="expense">📤 Pengeluaran</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Kategori</label>
+      <select id="tx-kategori"></select>
+    </div>
+    <div class="form-group">
+      <label>Jumlah (Rp)</label>
+      <input type="number" id="tx-jumlah" placeholder="50000">
+    </div>
+    <div class="form-group">
+      <label>Tanggal</label>
+      <input type="date" id="tx-tanggal">
+    </div>
+    <div class="form-group">
+      <label>Keterangan</label>
+      <input type="text" id="tx-keterangan" placeholder="Keterangan transaksi">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeModal('modal-transaksi')">Batal</button>
+      <button class="btn btn-primary" onclick="saveTransaksi()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Bayar Iuran -->
+<div class="modal-overlay" id="modal-bayar">
+  <div class="modal">
+    <h3>💳 Bayar Iuran</h3>
+    <input type="hidden" id="bayar-warga-id">
+    <p id="bayar-info" style="margin-bottom:12px;font-size:.9em;"></p>
+    <div class="form-group">
+      <label>Bulan</label>
+      <select id="bayar-bulan" multiple style="height:120px;"></select>
+      <small style="color:var(--text-light);">Tekan Ctrl untuk pilih beberapa bulan</small>
+    </div>
+    <div class="form-group">
+      <label>Tanggal Bayar</label>
+      <input type="date" id="bayar-tanggal">
+    </div>
+    <div class="form-group">
+      <label>Jumlah per Bulan (Rp)</label>
+      <input type="number" id="bayar-jumlah" placeholder="50000">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeModal('modal-bayar')">Batal</button>
+      <button class="btn btn-primary" onclick="bayarIuran()">Simpan Pembayaran</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DATA LAYER ====================
+const DB_KEY = 'rt_finance_data';
+
+function getDefaultData() {
+  return {
+    settings: { namaRT:'RT 001/RW 005', ketua:'', iuranBulanan:50000, kategori:['Iuran Warga','Keamanan','Kebersihan','Infrastruktur','Sosial','Operasional','Donasi','Lainnya'] },
+    warga: [],
+    transaksi: [],
+    pembayaran: [] // {id, wargaId, bulan, tahun, jumlah, tanggal}
+  };
+}
+
+function loadData() {
+  try {
+    const d = localStorage.getItem(DB_KEY);
+    return d ? JSON.parse(d) : getDefaultData();
+  } catch(e) { return getDefaultData(); }
+}
+
+function saveData(data) {
+  localStorage.setItem(DB_KEY, JSON.stringify(data));
+}
+
+let DATA = loadData();
+
+// ==================== HELPERS ====================
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function rp(n) { return 'Rp ' + Number(n||0).toLocaleString('id-ID'); }
+function tgl(d) { if(!d)return'-'; const dt=new Date(d); return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}); }
+function bulanNama(b) { return ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'][b-1]||''; }
+function bulanFull(b) { return ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][b-1]||''; }
+function now() { return new Date(); }
+function curMonth() { return now().getMonth()+1; }
+function curYear() { return now().getFullYear(); }
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ==================== NAV ====================
+function showTab(tab) {
+  ['dashboard','warga','keuangan','laporan','settings'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
+  });
+  document.querySelectorAll('.nav button').forEach((b,i) => {
+    b.classList.toggle('active', ['dashboard','warga','keuangan','laporan','settings'][i]===tab);
+  });
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='warga') renderWarga();
+  if(tab==='keuangan') renderKeuangan();
+  if(tab==='laporan') renderLaporan();
+  if(tab==='settings') renderSettings();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ==================== DASHBOARD ====================
+function renderDashboard() {
+  const cm = curMonth(), cy = curYear();
+  
+  // Stats
+  const totalIncome = DATA.transaksi.filter(t=>t.jenis==='income').reduce((s,t)=>s+t.jumlah,0);
+  const totalExpense = DATA.transaksi.filter(t=>t.jenis==='expense').reduce((s,t)=>s+t.jumlah,0);
+  document.getElementById('stat-income').textContent = rp(totalIncome);
+  document.getElementById('stat-expense').textContent = rp(totalExpense);
+  document.getElementById('stat-cash').textContent = rp(totalIncome - totalExpense);
+
+  // Iuran status
+  const iuran = DATA.settings.iuranBulanan;
+  const totalWarga = DATA.warga.length;
+  const paidThisMonth = DATA.pembayaran.filter(p=>p.bulan===cm && p.tahun===cy).map(p=>p.wargaId);
+  const paidCount = [...new Set(paidThisMonth)].length;
+  const pct = totalWarga ? Math.round(paidCount/totalWarga*100) : 0;
+  
+  document.getElementById('iuran-status').innerHTML = totalWarga === 0 
+    ? '<div class="empty-state"><div class="icon">👥</div><p>Belum ada data warga</p></div>'
+    : `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+         <span><strong>${paidCount}</strong> dari <strong>${totalWarga}</strong> warga sudah bayar</span>
+         <span style="font-weight:700;color:var(--primary);">${pct}%</span>
+       </div>
+       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+       <div style="margin-top:12px;font-size:.85em;color:var(--text-light);">
+         💰 Target bulan ini: ${rp(iuran * totalWarga)} &bull; Terkumpul: ${rp(iuran * paidCount)}
+       </div>`;
+
+  // Recent transactions
+  const recent = [...DATA.transaksi].sort((a,b)=>new Date(b.tanggal)-new Date(a.tanggal)).slice(0,5);
+  document.getElementById('recent-transactions').innerHTML = recent.length === 0
+    ? '<div class="empty-state"><div class="icon">📝</div><p>Belum ada transaksi</p></div>'
+    : `<table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th></tr></thead><tbody>
+       ${recent.map(t=>`<tr><td>${tgl(t.tanggal)}</td><td>${t.keterangan||t.kategori}</td><td><span class="badge badge-${t.jenis}">${t.jenis==='income'?'+':'−'} ${rp(t.jumlah)}</span></td></tr>`).join('')}
+       </tbody></table>`;
+}
+
+// ==================== WARGA ====================
+function renderWarga() {
+  const search = document.getElementById('search-warga').value.toLowerCase();
+  const filter = document.getElementById('filter-status').value;
+  const cm = curMonth(), cy = curYear();
+
+  let list = DATA.warga.filter(w => {
+    if(search && !w.nama.toLowerCase().includes(search) && !w.rumah.includes(search)) return false;
+    if(filter==='paid') {
+      const paid = DATA.pembayaran.some(p=>p.wargaId===w.id && p.bulan===cm && p.tahun===cy);
+      if(!paid) return false;
+    }
+    if(filter==='unpaid') {
+      const paid = DATA.pembayaran.some(p=>p.wargaId===w.id && p.bulan===cm && p.tahun===cy);
+      if(paid) return false;
+    }
+    return true;
+  });
+
+  if(list.length === 0) {
+    document.getElementById('table-warga').innerHTML = '<div class="empty-state"><div class="icon">👥</div><p>'+ (DATA.warga.length?'Tidak ditemukan':'Belum ada data warga') +'</p></div>';
+    return;
+  }
+
+  document.getElementById('table-warga').innerHTML = `
+    <div style="overflow-x:auto;">
+    <table><thead><tr><th>No</th><th>No. Rumah</th><th>Nama</th><th>Jiwa</th><th>Status Iuran</th><th>Aksi</th></tr></thead>
+    <tbody>${list.map((w,i) => {
+      const paid = DATA.pembayaran.some(p=>p.wargaId===w.id && p.bulan===cm && p.tahun===cy);
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${w.rumah}</td>
+        <td>${w.nama}</td>
+        <td>${w.jiwa||'-'}</td>
+        <td><span class="badge badge-${paid?'paid':'unpaid'}">${paid?'✅ Lunas':'❌ Belum'}</span></td>
+        <td>
+          ${paid ? '' : `<button class="btn btn-primary btn-sm" onclick="openBayar('${w.id}')">💳 Bayar</button> `}
+          <button class="btn btn-outline btn-sm" onclick="editWarga('${w.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="hapusWarga('${w.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function saveWarga() {
+  const id = document.getElementById('edit-warga-id').value;
+  const nama = document.getElementById('warga-nama').value.trim();
+  const rumah = document.getElementById('warga-rumah').value.trim();
+  const hp = document.getElementById('warga-hp').value.trim();
+  const jiwa = parseInt(document.getElementById('warga-jiwa').value) || 3;
+
+  if(!nama || !rumah) { toast('⚠️ Nama dan No. Rumah wajib diisi!'); return; }
+
+  if(id) {
+    const idx = DATA.warga.findIndex(w=>w.id===id);
+    if(idx>=0) { DATA.warga[idx] = {...DATA.warga[idx], nama, rumah, hp, jiwa}; }
+  } else {
+    DATA.warga.push({id:uid(), nama, rumah, hp, jiwa, created:new Date().toISOString()});
+  }
+  saveData(DATA);
+  closeModal('modal-warga');
+  document.getElementById('warga-nama').value='';
+  document.getElementById('warga-rumah').value='';
+  document.getElementById('warga-hp').value='';
+  document.getElementById('warga-jiwa').value='3';
+  document.getElementById('edit-warga-id').value='';
+  document.getElementById('modal-warga-title').textContent='➕ Tambah Warga';
+  renderWarga();
+  toast(id?'✅ Warga diperbarui':'✅ Warga ditambahkan');
+}
+
+function editWarga(id) {
+  const w = DATA.warga.find(w=>w.id===id);
+  if(!w) return;
+  document.getElementById('edit-warga-id').value = w.id;
+  document.getElementById('warga-nama').value = w.nama;
+  document.getElementById('warga-rumah').value = w.rumah;
+  document.getElementById('warga-hp').value = w.hp||'';
+  document.getElementById('warga-jiwa').value = w.jiwa||3;
+  document.getElementById('modal-warga-title').textContent='✏️ Edit Warga';
+  openModal('modal-warga');
+}
+
+function hapusWarga(id) {
+  if(!confirm('Yakin hapus warga ini? Semua data pembayaran juga akan dihapus.')) return;
+  DATA.warga = DATA.warga.filter(w=>w.id!==id);
+  DATA.pembayaran = DATA.pembayaran.filter(p=>p.wargaId!==id);
+  saveData(DATA);
+  renderWarga();
+  toast('🗑️ Warga dihapus');
+}
+
+// ==================== PEMBAYARAN IURAN ====================
+function openBayar(wargaId) {
+  const w = DATA.warga.find(w=>w.id===wargaId);
+  if(!w) return;
+  document.getElementById('bayar-warga-id').value = wargaId;
+  document.getElementById('bayar-info').textContent = `Warga: ${w.nama} (Rumah ${w.rumah})`;
+  document.getElementById('bayar-tanggal').value = new Date().toISOString().split('T')[0];
+  document.getElementById('bayar-jumlah').value = DATA.settings.iuranBulanan;
+  
+  // Populate months
+  const sel = document.getElementById('bayar-bulan');
+  sel.innerHTML = '';
+  const cm = curMonth(), cy = curYear();
+  for(let m=1;m<=12;m++) {
+    const alreadyPaid = DATA.pembayaran.some(p=>p.wargaId===wargaId && p.bulan===m && p.tahun===cy);
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = `${bulanFull(m)} ${cy}` + (alreadyPaid?' ✅':'');
+    opt.disabled = alreadyPaid;
+    if(m===cm && !alreadyPaid) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  openModal('modal-bayar');
+}
+
+function bayarIuran() {
+  const wargaId = document.getElementById('bayar-warga-id').value;
+  const bulanSel = document.getElementById('bayar-bulan');
+  const selectedBulan = [...bulanSel.selectedOptions].map(o=>parseInt(o.value)).filter(v=>!isNaN(v));
+  const tanggal = document.getElementById('bayar-tanggal').value;
+  const jumlah = parseInt(document.getElementById('bayar-jumlah').value) || 0;
+
+  if(!selectedBulan.length) { toast('⚠️ Pilih bulan pembayaran!'); return; }
+  if(!jumlah) { toast('⚠️ Jumlah wajib diisi!'); return; }
+
+  const cy = curYear();
+  selectedBulan.forEach(bulan => {
+    DATA.pembayaran.push({id:uid(), wargaId, bulan, tahun:cy, jumlah, tanggal});
+    DATA.transaksi.push({id:uid(), jenis:'income', kategori:'Iuran Warga', jumlah, tanggal, keterangan:`Iuran bulan ${bulanFull(bulan)} ${cy}`});
+  });
+
+  saveData(DATA);
+  closeModal('modal-bayar');
+  renderWarga();
+  toast(`✅ Pembayaran ${selectedBulan.length} bulan tercatat`);
+}
+
+// ==================== KEUANGAN ====================
+function renderKeuangan() {
+  // Populate month filter
+  const filterBulan = document.getElementById('filter-bulan');
+  const months = new Set(DATA.transaksi.map(t => {
+    const d = new Date(t.tanggal);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }));
+  const curVal = filterBulan.value;
+  filterBulan.innerHTML = '<option value="all">Semua Bulan</option>';
+  [...months].sort().reverse().forEach(m => {
+    const [y,mo] = m.split('-');
+    filterBulan.innerHTML += `<option value="${m}" ${m===curVal?'selected':''}>${bulanFull(parseInt(mo))} ${y}</option>`;
+  });
+
+  const filterJenis = document.getElementById('filter-jenis').value;
+  const filterMonth = filterBulan.value;
+
+  let list = [...DATA.transaksi];
+  if(filterJenis !== 'all') list = list.filter(t=>t.jenis===filterJenis);
+  if(filterMonth !== 'all') {
+    list = list.filter(t => {
+      const d = new Date(t.tanggal);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` === filterMonth;
+    });
+  }
+  list.sort((a,b)=>new Date(b.tanggal)-new Date(a.tanggal));
+
+  // Update kategori dropdown
+  const kategoriSel = document.getElementById('tx-kategori');
+  kategoriSel.innerHTML = DATA.settings.kategori.map(k=>`<option>${k}</option>`).join('');
+
+  if(list.length === 0) {
+    document.getElementById('table-keuangan').innerHTML = '<div class="empty-state"><div class="icon">💰</div><p>Belum ada transaksi</p></div>';
+    return;
+  }
+
+  document.getElementById('table-keuangan').innerHTML = `
+    <div style="overflow-x:auto;">
+    <table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Kategori</th><th>Keterangan</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+    <tbody>${list.map(t=>`<tr>
+      <td>${tgl(t.tanggal)}</td>
+      <td><span class="badge badge-${t.jenis}">${t.jenis==='income'?'📥 Masuk':'📤 Keluar'}</span></td>
+      <td>${t.kategori}</td>
+      <td>${t.keterangan||'-'}</td>
+      <td style="font-weight:600;">${t.jenis==='income'?'+':'−'} ${rp(t.jumlah)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="hapusTransaksi('${t.id}')">🗑️</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function saveTransaksi() {
+  const jenis = document.getElementById('tx-jenis').value;
+  const kategori = document.getElementById('tx-kategori').value;
+  const jumlah = parseInt(document.getElementById('tx-jumlah').value) || 0;
+  const tanggal = document.getElementById('tx-tanggal').value;
+  const keterangan = document.getElementById('tx-keterangan').value.trim();
+
+  if(!jumlah || !tanggal) { toast('⚠️ Jumlah dan tanggal wajib diisi!'); return; }
+
+  DATA.transaksi.push({id:uid(), jenis, kategori, jumlah, tanggal, keterangan});
+  saveData(DATA);
+  closeModal('modal-transaksi');
+  document.getElementById('tx-jumlah').value='';
+  document.getElementById('tx-keterangan').value='';
+  renderKeuangan();
+  toast('✅ Transaksi ditambahkan');
+}
+
+function hapusTransaksi(id) {
+  if(!confirm('Yakin hapus transaksi ini?')) return;
+  // Check if this is an iuran payment
+  const tx = DATA.transaksi.find(t=>t.id===id);
+  DATA.transaksi = DATA.transaksi.filter(t=>t.id!==id);
+  if(tx && tx.kategori==='Iuran Warga') {
+    // Also remove corresponding payment record
+    DATA.pembayaran = DATA.pembayaran.filter(p=>!(p.tanggal===tx.tanggal && p.jumlah===tx.jumlah));
+  }
+  saveData(DATA);
+  renderKeuangan();
+  toast('🗑️ Transaksi dihapus');
+}
+
+// ==================== LAPORAN ====================
+function renderLaporan() {
+  const bulanSel = document.getElementById('laporan-bulan');
+  const tahunSel = document.getElementById('laporan-tahun');
+  
+  if(!bulanSel.options.length) {
+    for(let m=1;m<=12;m++) {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = bulanFull(m);
+      if(m===curMonth()) opt.selected = true;
+      bulanSel.appendChild(opt);
+    }
+    const years = [...new Set([
+      curYear(),
+      ...DATA.transaksi.map(t=>new Date(t.tanggal).getFullYear()),
+      ...DATA.pembayaran.map(p=>p.tahun)
+    ])].sort((a,b)=>b-a);
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      tahunSel.appendChild(opt);
+    });
+  }
+  generateLaporan();
+}
+
+function generateLaporan() {
+  const bulan = parseInt(document.getElementById('laporan-bulan').value);
+  const tahun = parseInt(document.getElementById('laporan-tahun').value);
+  
+  const txMonth = DATA.transaksi.filter(t => {
+    const d = new Date(t.tanggal);
+    return d.getMonth()+1===bulan && d.getFullYear()===tahun;
+  });
+
+  const income = txMonth.filter(t=>t.jenis==='income').reduce((s,t)=>s+t.jumlah,0);
+  const expense = txMonth.filter(t=>t.jenis==='expense').reduce((s,t)=>s+t.jumlah,0);
+  
+  // Total all time
+  const totalIncome = DATA.transaksi.filter(t=>t.jenis==='income').reduce((s,t)=>s+t.jumlah,0);
+  const totalExpense = DATA.transaksi.filter(t=>t.jenis==='expense').reduce((s,t)=>s+t.jumlah,0);
+  const kasAkhir = totalIncome - totalExpense;
+
+  // Iuran detail
+  const paidWarga = DATA.pembayaran.filter(p=>p.bulan===bulan && p.tahun===tahun);
+  const paidIds = [...new Set(paidWarga.map(p=>p.wargaId))];
+  const unpaidWarga = DATA.warga.filter(w=>!paidIds.includes(w.id));
+
+  // Expense by category
+  const expenseByCat = {};
+  txMonth.filter(t=>t.jenis==='expense').forEach(t => {
+    expenseByCat[t.kategori] = (expenseByCat[t.kategori]||0) + t.jumlah;
+  });
+
+  let html = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <h2 style="color:var(--primary);">LAPORAN KEUANGAN RT</h2>
+      <p style="color:var(--text-light);">${bulanFull(bulan)} ${tahun}</p>
+      <p style="font-size:.85em;">${DATA.settings.namaRT} — Ketua: ${DATA.settings.ketua||'-'}</p>
+    </div>
+
+    <div class="stats" style="margin-bottom:20px;">
+      <div class="stat-card income"><div class="label">Pemasukan</div><div class="amount">${rp(income)}</div></div>
+      <div class="stat-card expense"><div class="label">Pengeluaran</div><div class="amount">${rp(expense)}</div></div>
+      <div class="stat-card cash"><div class="label">Saldo Bulan Ini</div><div class="amount">${rp(income-expense)}</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3>💰 Ringkasan Kas</h3>
+      <table>
+        <tr><td>Total Pemasukan (Kumulatif)</td><td style="text-align:right;font-weight:600;">${rp(totalIncome)}</td></tr>
+        <tr><td>Total Pengeluaran (Kumulatif)</td><td style="text-align:right;font-weight:600;">${rp(totalExpense)}</td></tr>
+        <tr style="background:#E8F5E9;"><td><strong>Kas Tersedia</strong></td><td style="text-align:right;font-weight:700;color:var(--success);font-size:1.1em;">${rp(kasAkhir)}</td></tr>
+      </table>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3>👥 Status Iuran ${bulanFull(bulan)}</h3>
+      <p style="font-size:.85em;margin-bottom:10px;">Terkumpul: <strong>${rp(paidIds.length * DATA.settings.iuranBulanan)}</strong> dari ${DATA.warga.length} warga</p>
+      ${unpaidWarga.length ? `<p style="font-size:.85em;color:var(--danger);">❌ Belum bayar (${unpaidWarga.length}): ${unpaidWarga.map(w=>w.nama+', Rumah '+w.rumah).join(' | ')}</p>` : '<p style="color:var(--success);">✅ Semua warga sudah bayar!</p>'}
+    </div>`;
+
+  if(Object.keys(expenseByCat).length) {
+    html += `<div class="card"><h3>📤 Pengeluaran per Kategori</h3><table>
+      <thead><tr><th>Kategori</th><th style="text-align:right;">Jumlah</th></tr></thead>
+      <tbody>${Object.entries(expenseByCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${k}</td><td style="text-align:right;">${rp(v)}</td></tr>`).join('')}
+      <tr style="background:#FFEBEE;font-weight:700;"><td>Total</td><td style="text-align:right;">${rp(expense)}</td></tr>
+      </tbody></table></div>`;
+  }
+
+  document.getElementById('laporan-content').innerHTML = html;
+}
+
+function printLaporan() {
+  window.print();
+}
+
+function exportCSV() {
+  const bulan = parseInt(document.getElementById('laporan-bulan').value);
+  const tahun = parseInt(document.getElementById('laporan-tahun').value);
+  const txMonth = DATA.transaksi.filter(t => {
+    const d = new Date(t.tanggal);
+    return d.getMonth()+1===bulan && d.getFullYear()===tahun;
+  });
+
+  let csv = 'Tanggal,Jenis,Kategori,Keterangan,Jumlah\n';
+  txMonth.forEach(t => {
+    csv += `${t.tanggal},${t.jenis==='income'?'Pemasukan':'Pengeluaran'},${t.kategori},"${t.keterangan||''}",${t.jumlah}\n`;
+  });
+
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Laporan_Keuangan_RT_${bulanFull(bulan)}_${tahun}.csv`;
+  a.click();
+  toast('📥 CSV berhasil diunduh');
+}
+
+// ==================== SETTINGS ====================
+function renderSettings() {
+  document.getElementById('setting-nama-rt').value = DATA.settings.namaRT || '';
+  document.getElementById('setting-ketua').value = DATA.settings.ketua || '';
+  document.getElementById('setting-iuran').value = DATA.settings.iuranBulanan || '';
+  document.getElementById('setting-kategori').value = (DATA.settings.kategori||[]).join('\n');
+}
+
+function saveSettings() {
+  DATA.settings.namaRT = document.getElementById('setting-nama-rt').value.trim();
+  DATA.settings.ketua = document.getElementById('setting-ketua').value.trim();
+  DATA.settings.iuranBulanan = parseInt(document.getElementById('setting-iuran').value) || 0;
+  const kategoriText = document.getElementById('setting-kategori').value.trim();
+  DATA.settings.kategori = kategoriText ? kategoriText.split('\n').map(s=>s.trim()).filter(Boolean) : DATA.settings.kategori;
+  saveData(DATA);
+  toast('✅ Pengaturan disimpan');
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(DATA,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `backup_rt_finance_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  toast('📥 Data berhasil diexport');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if(imported.settings && imported.warga) {
+        if(!confirm('Import akan menimpa semua data yang ada. Lanjutkan?')) return;
+        DATA = imported;
+        saveData(DATA);
+        renderDashboard();
+        toast('✅ Data berhasil diimport');
+      } else {
+        toast('⚠️ Format file tidak valid');
+      }
+    } catch(err) { toast('⚠️ Gagal membaca file'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function resetData() {
+  if(!confirm('⚠️ PERINGATAN: Semua data akan dihapus permanen!\n\nKetik OK untuk melanjutkan.')) return;
+  if(!confirm('Yakin 100%? Data yang dihapus tidak bisa dikembalikan.')) return;
+  DATA = getDefaultData();
+  saveData(DATA);
+  renderDashboard();
+  toast('🗑️ Semua data direset');
+}
+
+// ==================== INIT ====================
+document.getElementById('tx-tanggal').value = new Date().toISOString().split('T')[0];
+renderDashboard();
+</script>
+</body>
+</html>
