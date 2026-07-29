@@ -464,6 +464,20 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
   </div>
 </div>
 
+<!-- MODAL: Edit Pembayaran -->
+<div class="modal-overlay" id="modal-edit-bayar">
+  <div class="modal">
+    <h3>✏️ Edit Pembayaran Iuran</h3>
+    <input type="hidden" id="edit-bayar-idx">
+    <p id="edit-bayar-info" style="margin-bottom:14px;font-size:.95em;font-weight:600;color:var(--primary)"></p>
+    <div id="edit-bayar-checks" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-bayar')">Batal</button>
+      <button class="btn btn-primary" onclick="saveEditBayar()">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ==================== CONFIG ====================
 const BLN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
@@ -918,7 +932,9 @@ function renderTabel(){
       <th>No</th><th style="text-align:left;min-width:160px">Nama</th><th>Blok</th>`;
 
   for(let m=1;m<=12;m++) html+=`<th style="min-width:32px">${BLN[m-1]}</th>`;
-  html+=`<th>Total</th><th>Tunggakan</th></tr></thead><tbody>`;
+  html+=`<th>Total</th><th>Tunggakan</th>`;
+  if(isAdmin) html+=`<th>Aksi</th>`;
+  html+=`</tr></thead><tbody>`;
 
   list.forEach(w=>{
     const total=getTotalBayar(w.idx);
@@ -946,6 +962,7 @@ function renderTabel(){
 
     html+=`<td class="total-cell">${rp(totalRp)}</td>`;
     html+=`<td class="tunggakan-cell">${w.kosong?'—':rp(tunggakan)}</td>`;
+    if(isAdmin) html+=`<td><button class="btn btn-primary btn-sm" onclick="openEditBayar(${w.idx})">✏️ Edit</button></td>`;
     html+=`</tr>`;
   });
 
@@ -959,13 +976,54 @@ function renderTabel(){
   const grandTunggakan=DB.warga.reduce((s,w,i)=>{return s+(12-getTotalBayar(i))*getIuran(w)},0);
   html+=`<td class="total-cell">${rp(grandTotal)}</td>`;
   html+=`<td class="tunggakan-cell">${rp(grandTunggakan)}</td>`;
+  if(isAdmin) html+=`<td></td>`;
   html+=`</tr></tfoot></table></div>`;
 
   if(isAdmin){
-    html+=`<div style="margin-top:10px;font-size:.78em;color:var(--text-light)">💡 Klik ✘ untuk toggle bayar/belum</div>`;
+    html+=`<div style="margin-top:10px;font-size:.78em;color:var(--text-light)">💡 Klik ✘/✔ untuk toggle cepat, atau klik ✏️ Edit untuk edit semua bulan sekaligus</div>`;
   }
 
   document.getElementById('tabel-iuran').innerHTML=html;
+}
+
+function openEditBayar(idx){
+  const w=DB.warga[idx];
+  if(!w||w.kosong)return;
+  document.getElementById('edit-bayar-idx').value=idx;
+  document.getElementById('edit-bayar-info').textContent=`${w.nama} (${w.blok}) — ${rp(getIuran(w))}/bulan`;
+  
+  let html='';
+  for(let m=1;m<=12;m++){
+    const paid=isPaid(idx,m);
+    html+=`<label style="display:flex;align-items:center;gap:6px;padding:10px;background:${paid?'#E8F5E9':'#fff'};border:2px solid ${paid?'var(--success)':'var(--border)'};border-radius:8px;cursor:pointer;font-size:.88em;font-weight:600">
+      <input type="checkbox" id="eb-${m}" ${paid?'checked':''} style="width:18px;height:18px">
+      ${BLN_FULL[m-1]}
+    </label>`;
+  }
+  document.getElementById('edit-bayar-checks').innerHTML=html;
+  openModal('modal-edit-bayar');
+}
+
+function saveEditBayar(){
+  const idx=parseInt(document.getElementById('edit-bayar-idx').value);
+  const w=DB.warga[idx];
+  if(!w)return;
+  
+  for(let m=1;m<=12;m++){
+    const cb=document.getElementById('eb-'+m);
+    if(cb.checked){
+      w.bayar[m]=1;
+    } else {
+      delete w.bayar[m];
+    }
+  }
+  
+  saveDB(DB);
+  closeModal('modal-edit-bayar');
+  renderTabel();
+  renderDashboard();
+  renderLaporan();
+  toast(`✅ Pembayaran ${w.nama} diperbarui`);
 }
 
 function toggleBayar(idx,bulan){
