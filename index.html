@@ -218,7 +218,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
     <p>RT 02/RW 014 — Tahun 2026</p>
     <div class="info-row">
       <span>📍 Ciputat Timur, Tangerang Selatan</span>
-      <span>💰 Iuran: Rp 200.000/bulan</span>
+      <span>💰 Iuran: Rp 200.000/bl (Kosong: Rp 100.000/bl)</span>
       <span id="info-role"></span>
     </div>
   </div>
@@ -466,6 +466,8 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
 const BLN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
 const BLN_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const IURAN = 200000;
+const IURAN_KOSONG = 100000; // 50% untuk rumah kosong
+function getIuran(w){ return w.kosong ? IURAN_KOSONG : IURAN; }
 const TAHUN = 2026;
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'rt02griya';
@@ -638,12 +640,12 @@ function renderDashboardAdmin(){
   const lunas = DB.warga.filter((w,i)=>getTotalBayar(i)>=6&&!w.kosong).length;
   const belumLunas = sudahBayar - lunas;
 
-  const totalIuran = DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
+  const totalIuran = DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*getIuran(w),0);
   const totalMasuk = DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
   const totalKeluar = DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
   const saldoKas = totalIuran + totalMasuk - totalKeluar;
   // Tunggakan = jumlah bulan belum bayar × IURAN (hanya warga aktif)
-  const totalTunggakan = DB.warga.reduce((s,w,i) => { if(w.kosong) return s; return s + (12 - getTotalBayar(i)) * IURAN; }, 0);
+  const totalTunggakan = DB.warga.reduce((s,w,i) => { return s + (12 - getTotalBayar(i)) * getIuran(w); }, 0);
 
   document.getElementById('dash-kas').textContent = rp(saldoKas);
   document.getElementById('dash-warga').textContent = sudahBayar + '/' + totalAktif;
@@ -685,7 +687,7 @@ function renderDashboardAdmin(){
   const pemasukanBulanan = [];
   const pengeluaranBulanan = [];
   for(let m=1;m<=12;m++){
-    const iuran = DB.warga.filter((w,i)=>isPaid(i,m)).length * IURAN;
+    const iuran = DB.warga.filter((w,i)=>isPaid(i,m)).reduce((s,w)=>s+getIuran(w),0);
     const masukLain = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
     const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
     pemasukanBulanan.push(iuran + masukLain);
@@ -782,9 +784,9 @@ function renderDashboardWarga(){
   const w = DB.warga[idx];
   const totalBayar = getTotalBayar(idx);
   const totalBelum = 12 - totalBayar;
-  const tunggakan = totalBelum * IURAN;
+  const tunggakan = totalBelum * getIuran(w);
 
-  const totalIuran = DB.warga.reduce((s,wi,i)=>s+getTotalBayar(i)*IURAN,0);
+  const totalIuran = DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*getIuran(w),0);
   const totalMasuk = DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
   const totalKeluar = DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
   const saldoKas = totalIuran + totalMasuk - totalKeluar;
@@ -843,7 +845,7 @@ function renderDashboardWarga(){
   const pemasukanBulanan = [];
   const pengeluaranBulanan = [];
   for(let m=1;m<=12;m++){
-    const iuran = DB.warga.filter((w,i)=>isPaid(i,m)).length * IURAN;
+    const iuran = DB.warga.filter((w,i)=>isPaid(i,m)).reduce((s,w)=>s+getIuran(w),0);
     const masukLain = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
     const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
     pemasukanBulanan.push(iuran + masukLain);
@@ -899,8 +901,8 @@ function renderTabel(){
   const totalKosong=DB.warga.filter(w=>w.kosong).length;
   const sudahBayar=DB.warga.filter((w,i)=>getTotalBayar(i)>0&&!w.kosong).length;
   const belumBayar=totalWarga-totalKosong-sudahBayar;
-  const totalTerkumpul=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
-  const totalTunggakan=DB.warga.reduce((s,w,i)=>{if(w.kosong)return s;return s+(12-getTotalBayar(i))*IURAN},0);
+  const totalTerkumpul=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*getIuran(w),0);
+  const totalTunggakan=DB.warga.reduce((s,w,i)=>{return s+(12-getTotalBayar(i))*getIuran(w)},0);
 
   document.getElementById('stat-terkumpul').textContent=rp(totalTerkumpul);
   document.getElementById('stat-tunggakan').textContent=rp(totalTunggakan);
@@ -917,8 +919,8 @@ function renderTabel(){
 
   list.forEach(w=>{
     const total=getTotalBayar(w.idx);
-    const totalRp=total*IURAN;
-    const tunggakan=(12-total)*IURAN;
+    const totalRp=total*getIuran(w);
+    const tunggakan=(12-total)*getIuran(w);
     const rowClass=w.kosong?'kosong-row':(total>0?'':'highlight-row');
 
     html+=`<tr class="${rowClass}">
@@ -950,8 +952,8 @@ function renderTabel(){
     const mc=DB.warga.filter((w,i)=>isPaid(i,m)).length;
     html+=`<td>${mc}</td>`;
   }
-  const grandTotal=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
-  const grandTunggakan=DB.warga.reduce((s,w,i)=>{if(w.kosong)return s;return s+(12-getTotalBayar(i))*IURAN},0);
+  const grandTotal=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*getIuran(w),0);
+  const grandTunggakan=DB.warga.reduce((s,w,i)=>{return s+(12-getTotalBayar(i))*getIuran(w)},0);
   html+=`<td class="total-cell">${rp(grandTotal)}</td>`;
   html+=`<td class="tunggakan-cell">${rp(grandTunggakan)}</td>`;
   html+=`</tr></tfoot></table></div>`;
@@ -1116,7 +1118,7 @@ function renderLaporan(){
   const iuranPerBulan = [], masukPerBulan = [], keluarPerBulan = [], saldoPerBulan = [];
 
   months.forEach(m => {
-    const iuran = DB.warga.filter((w,i) => isPaid(i,m)).length * IURAN;
+    const iuran = DB.warga.filter((w,i) => isPaid(i,m)).reduce((s,w)=>s+getIuran(w),0);
     const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
     const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
     totalIuran += iuran;
@@ -1152,7 +1154,7 @@ function renderLaporan(){
   let totalTunggakan = 0;
   DB.warga.forEach((w,i) => {
     if(w.kosong) return;
-    totalTunggakan += (12 - getTotalBayar(i)) * IURAN;
+    totalTunggakan += (12 - getTotalBayar(i)) * getIuran(w);
   });
 
   // Build HTML
@@ -1244,7 +1246,7 @@ function renderLaporan(){
       <div>Warga Aktif: <strong>${totalAktif}</strong></div>
       <div>Sudah Bayar: <strong>${sudahBayarCount}</strong></div>
       <div>Belum Bayar: <strong>${belumBayarCount}</strong></div>
-      <div>Iuran/bulan: <strong>${rp(IURAN)}</strong></div>
+      <div>Iuran/bulan: <strong>${rp(IURAN)}</strong> (Rumah kosong: ${rp(IURAN_KOSONG)})</div>
       <div>Periode: <strong>${labelPeriode}</strong></div>
     </div>
   `;
@@ -1265,8 +1267,8 @@ function renderLaporan(){
         if(paid) bayar++;
         html += `<td>${paid ? '<span class="check">✔</span>' : '<span class="cross">✘</span>'}</td>`;
       });
-      const tunggakanWarga = (months.length - bayar) * IURAN;
-      html += `<td class="total-cell">${rp(bayar * IURAN)}</td>`;
+      const tunggakanWarga = (months.length - bayar) * getIuran(w);
+      html += `<td class="total-cell">${rp(bayar * getIuran(w))}</td>`;
       html += `<td class="tunggakan-cell">${rp(tunggakanWarga)}</td></tr>`;
     });
 
@@ -1281,10 +1283,10 @@ function exportCSV(){
   let csv='No,Nama,Blok/No,Jan,Feb,Mar,Apr,Mei,Jun,Jul,Ags,Sep,Okt,Nov,Des,Total Bayar,Tunggakan\n';
   DB.warga.forEach((w,i)=>{
     const total=getTotalBayar(i);
-    const tunggakan=w.kosong?0:(6-total)*IURAN;
+    const tunggakan=(12-total)*getIuran(w);
     const months=[];
     for(let m=1;m<=12;m++)months.push(isPaid(i,m)?'1':'0');
-    csv+=`${w.no},"${w.nama}",${w.blok},${months.join(',')},${total*IURAN},${tunggakan}\n`;
+    csv+=`${w.no},"${w.nama}",${w.blok},${months.join(',')},${total*getIuran(w)},${tunggakan}\n`;
   });
   const blob=new Blob([csv],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
