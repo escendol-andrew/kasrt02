@@ -1079,8 +1079,14 @@ function toggleBayar(idx,bulan){
 
 // ==================== KEUANGAN ====================
 function renderKeuangan(){
-  const totalMasuk=DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
+  // Hitung iuran masuk dari data warga
+  let totalIuranMasuk=0;
+  for(let m=1;m<=12;m++){
+    DB.warga.forEach((w,i)=>{if(isPaid(i,m))totalIuranMasuk+=getIuran(w)});
+  }
+  const totalTxMasuk=DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
   const totalKeluar=DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
+  const totalMasuk=totalIuranMasuk+totalTxMasuk;
   document.getElementById('stat-pemasukan').textContent=rp(totalMasuk);
   document.getElementById('stat-pengeluaran').textContent=rp(totalKeluar);
   document.getElementById('stat-saldo').textContent=rp(totalMasuk-totalKeluar);
@@ -1093,6 +1099,20 @@ function renderKeuangan(){
 function renderTabelKeuangan(jenis,elementId){
   const txList=DB.transaksi.filter(t=>t.jenis===jenis);
   const kategoriMap={};
+
+  // Tambahkan iuran warga sebagai pemasukan
+  if(jenis==='masuk'){
+    for(let m=1;m<=12;m++){
+      DB.warga.forEach((w,i)=>{
+        if(isPaid(i,m)){
+          const key='Iuran Warga ('+w.nama+')';
+          if(!kategoriMap[key])kategoriMap[key]={};
+          kategoriMap[key][m]=(kategoriMap[key][m]||0)+getIuran(w);
+        }
+      });
+    }
+  }
+
   txList.forEach(t=>{
     const key=t.keterangan||'Lainnya';
     if(!kategoriMap[key])kategoriMap[key]={};
@@ -1132,7 +1152,24 @@ function renderJurnalUmum(){
   const jenisFilter=document.getElementById('filter-jenis').value;
   const isAdmin=currentUser&&currentUser.role==='admin';
 
-  let list=DB.transaksi.filter(t=>{
+  // Gabungkan iuran warga + transaksi lain
+  let allList=[];
+
+  // Tambahkan iuran warga
+  for(let m=1;m<=12;m++){
+    DB.warga.forEach((w,i)=>{
+      if(isPaid(i,m)){
+        const tanggal=TAHUN+'-'+String(m).padStart(2,'0')+'-01';
+        allList.push({id:'iuran_'+i+'_'+m',jenis:'masuk',keterangan:'Iuran '+w.nama+' ('+BLN_FULL[m-1]+')',jumlah:getIuran(w),tanggal:tanggal});
+      }
+    });
+  }
+
+  // Tambahkan transaksi lain
+  DB.transaksi.forEach(t=>allList.push(t));
+
+  // Filter
+  let list=allList.filter(t=>{
     if(bulanFilter!=='all'){const m=new Date(t.tanggal).getMonth()+1;if(m!==parseInt(bulanFilter))return false}
     if(jenisFilter!=='all'&&t.jenis!==jenisFilter)return false;
     return true;
@@ -1146,11 +1183,18 @@ function renderJurnalUmum(){
     const tgl=new Date(t.tanggal).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
     const isMasuk=t.jenis==='masuk';
     if(isMasuk)saldo+=t.jumlah;else saldo-=t.jumlah;
+    const isIuran=t.id&&t.id.startsWith('iuran_');
     html+=`<tr><td>${no++}</td><td>${tgl}</td><td style="text-align:left">${t.keterangan}</td>
       <td><span class="badge ${isMasuk?'badge-paid':'badge-unpaid'}">${isMasuk?'📥 Masuk':'📤 Keluar'}</span></td>
       <td style="color:var(--success)">${isMasuk?rp(t.jumlah):'—'}</td>
       <td style="color:var(--danger)">${!isMasuk?rp(t.jumlah):'—'}</td>`;
-    if(isAdmin)html+=`<td><button class="btn btn-primary btn-sm" onclick="editTransaksi('${t.id}')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapusTransaksi('${t.id}')">🗑️</button></td>`;
+    if(isAdmin){
+      if(isIuran){
+        html+=`<td><span class="badge badge-blue">Otomatis</span></td>`;
+      } else {
+        html+=`<td><button class="btn btn-primary btn-sm" onclick="editTransaksi('${t.id}')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapusTransaksi('${t.id}')">🗑️</button></td>`;
+      }
+    }
     html+=`</tr>`;
   });
   html+=`</tbody></table></div>`;
