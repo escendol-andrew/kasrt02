@@ -471,6 +471,10 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
     <input type="hidden" id="edit-bayar-idx">
     <p id="edit-bayar-info" style="margin-bottom:14px;font-size:.95em;font-weight:600;color:var(--primary)"></p>
     <div class="form-group"><label>👤 Nama Pemilik Rumah</label><input type="text" id="edit-bayar-nama" placeholder="Nama warga"></div>
+    <label style="display:flex;align-items:center;gap:8px;padding:10px;background:#FFF8E1;border:2px solid var(--warning);border-radius:8px;cursor:pointer;font-size:.88em;font-weight:600;margin-bottom:14px">
+      <input type="checkbox" id="edit-bayar-kosong" style="width:18px;height:18px">
+      🏠 Rumah Kosong (iuran 50%)
+    </label>
     <h4 style="font-size:.88em;margin-bottom:8px">📅 Status Pembayaran Bulanan</h4>
     <div id="edit-bayar-checks" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -994,6 +998,7 @@ function openEditBayar(idx){
   document.getElementById('edit-bayar-idx').value=idx;
   document.getElementById('edit-bayar-info').textContent=`${w.nama} (${w.blok}) — ${rp(getIuran(w))}/bulan`;
   document.getElementById('edit-bayar-nama').value=w.nama;
+  document.getElementById('edit-bayar-kosong').checked=!!w.kosong;
   
   let html='';
   for(let m=1;m<=12;m++){
@@ -1015,6 +1020,9 @@ function saveEditBayar(){
   // Update nama
   const namaBaru=document.getElementById('edit-bayar-nama').value.trim();
   if(namaBaru) w.nama=namaBaru;
+  
+  // Update status kosong
+  w.kosong=document.getElementById('edit-bayar-kosong').checked;
   
   // Update pembayaran
   for(let m=1;m<=12;m++){
