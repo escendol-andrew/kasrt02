@@ -1152,55 +1152,53 @@ function renderJurnalUmum(){
   const jenisFilter=document.getElementById('filter-jenis').value;
   const isAdmin=currentUser&&currentUser.role==='admin';
 
-  // Gabungkan iuran warga + transaksi lain
   let allList=[];
-
-  // Tambahkan iuran warga
-  for(let m=1;m<=12;m++){
-    DB.warga.forEach((w,i)=>{
+  for(var m=1;m<=12;m++){
+    DB.warga.forEach(function(w,i){
       if(isPaid(i,m)){
-        const tanggal=TAHUN+'-'+String(m).padStart(2,'0')+'-01';
-        allList.push({id:'iuran_'+i+'_'+m',jenis:'masuk',keterangan:'Iuran '+w.nama+' ('+BLN_FULL[m-1]+')',jumlah:getIuran(w),tanggal:tanggal});
+        var tgl=TAHUN+'-'+String(m).padStart(2,'0')+'-01';
+        allList.push({id:'iuran_'+i+'_'+m,jenis:'masuk',keterangan:'Iuran '+w.nama+' ('+BLN_FULL[m-1]+')',jumlah:getIuran(w),tanggal:tgl});
       }
     });
   }
+  DB.transaksi.forEach(function(t){allList.push(t)});
 
-  // Tambahkan transaksi lain
-  DB.transaksi.forEach(t=>allList.push(t));
-
-  // Filter
-  let list=allList.filter(t=>{
-    if(bulanFilter!=='all'){const m=new Date(t.tanggal).getMonth()+1;if(m!==parseInt(bulanFilter))return false}
+  var list=allList.filter(function(t){
+    if(bulanFilter!=='all'){var bm=new Date(t.tanggal).getMonth()+1;if(bm!==parseInt(bulanFilter))return false}
     if(jenisFilter!=='all'&&t.jenis!==jenisFilter)return false;
     return true;
-  }).sort((a,b)=>new Date(a.tanggal)-new Date(b.tanggal));
+  }).sort(function(a,b){return new Date(a.tanggal)-new Date(b.tanggal)});
 
-  if(!list.length){document.getElementById('tabel-keuangan').innerHTML=`<div style="text-align:center;padding:20px;color:var(--text-light)">Belum ada transaksi</div>`;return}
+  if(!list.length){document.getElementById('tabel-keuangan').innerHTML='<div style="text-align:center;padding:20px;color:var(--text-light)">Belum ada transaksi</div>';return}
 
-  let html=`<div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Debet</th><th>Kredit</th>${isAdmin?'<th>Aksi</th>':''}</tr></thead><tbody>`;
-  let no=1,saldo=0;
-  list.forEach(t=>{
-    const tgl=new Date(t.tanggal).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
-    const isMasuk=t.jenis==='masuk';
+  var html='<div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Keterangan</th><th>Jenis</th><th>Debet</th><th>Kredit</th>';
+  if(isAdmin) html+='<th>Aksi</th>';
+  html+='</tr></thead><tbody>';
+  var no=1,saldo=0;
+  list.forEach(function(t){
+    var tgl=new Date(t.tanggal).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+    var isMasuk=t.jenis==='masuk';
     if(isMasuk)saldo+=t.jumlah;else saldo-=t.jumlah;
-    const isIuran=t.id&&t.id.startsWith('iuran_');
-    html+=`<tr><td>${no++}</td><td>${tgl}</td><td style="text-align:left">${t.keterangan}</td>
-      <td><span class="badge ${isMasuk?'badge-paid':'badge-unpaid'}">${isMasuk?'📥 Masuk':'📤 Keluar'}</span></td>
-      <td style="color:var(--success)">${isMasuk?rp(t.jumlah):'—'}</td>
-      <td style="color:var(--danger)">${!isMasuk?rp(t.jumlah):'—'}</td>`;
+    var isIuran=t.id&&t.id.indexOf('iuran_')===0;
+    html+='<tr><td>'+no+'</td><td>'+tgl+'</td><td style="text-align:left">'+t.keterangan+'</td>';
+    html+='<td><span class="badge '+(isMasuk?'badge-paid':'badge-unpaid')+'">'+(isMasuk?'Masuk':'Keluar')+'</span></td>';
+    html+='<td style="color:var(--success)">'+(isMasuk?rp(t.jumlah):'-')+'</td>';
+    html+='<td style="color:var(--danger)">'+(!isMasuk?rp(t.jumlah):'-')+'</td>';
     if(isAdmin){
       if(isIuran){
-        html+=`<td><span class="badge badge-blue">Otomatis</span></td>`;
+        html+='<td><span class="badge badge-blue">Otomatis</span></td>';
       } else {
-        html+=`<td><button class="btn btn-primary btn-sm" onclick="editTransaksi('${t.id}')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapusTransaksi('${t.id}')">🗑️</button></td>`;
+        html+='<td><button class="btn btn-primary btn-sm" onclick="editTransaksi(\x27'+t.id+'\x27)">Edit</button> <button class="btn btn-danger btn-sm" onclick="hapusTransaksi(\x27'+t.id+'\x27)">Hapus</button></td>';
       }
     }
-    html+=`</tr>`;
+    html+='</tr>';
+    no++;
   });
-  html+=`</tbody></table></div>`;
-  html+=`<div style="margin-top:8px;text-align:right;font-weight:700;font-size:.9em">Saldo: ${rp(saldo)}</div>`;
+  html+='</tbody></table></div>';
+  html+='<div style="margin-top:8px;text-align:right;font-weight:700;font-size:.9em">Saldo: '+rp(saldo)+'</div>';
   document.getElementById('tabel-keuangan').innerHTML=html;
 }
+
 
 function savePemasukan(){
   const k=document.getElementById('tx-masuk-keterangan').value.trim();
