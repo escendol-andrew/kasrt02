@@ -645,7 +645,8 @@ function renderDashboardAdmin(){
   const totalMasuk = DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
   const totalKeluar = DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
   const saldoKas = totalIuran + totalMasuk - totalKeluar;
-  const totalTunggakan = totalWarga*6*IURAN - totalIuran;
+  // Tunggakan = jumlah bulan belum bayar × IURAN (hanya warga aktif)
+  const totalTunggakan = DB.warga.reduce((s,w,i) => { if(w.kosong) return s; return s + (6 - getTotalBayar(i)) * IURAN; }, 0);
 
   document.getElementById('dash-kas').textContent = rp(saldoKas);
   document.getElementById('dash-warga').textContent = sudahBayar + '/' + totalAktif;
@@ -902,7 +903,7 @@ function renderTabel(){
   const sudahBayar=DB.warga.filter((w,i)=>getTotalBayar(i)>0&&!w.kosong).length;
   const belumBayar=totalWarga-totalKosong-sudahBayar;
   const totalTerkumpul=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
-  const totalTunggakan=totalWarga*6*IURAN-totalTerkumpul;
+  const totalTunggakan=DB.warga.reduce((s,w,i)=>{if(w.kosong)return s;return s+(6-getTotalBayar(i))*IURAN},0);
 
   document.getElementById('stat-terkumpul').textContent=rp(totalTerkumpul);
   document.getElementById('stat-tunggakan').textContent=rp(totalTunggakan);
@@ -953,8 +954,9 @@ function renderTabel(){
     html+=`<td>${mc}</td>`;
   }
   const grandTotal=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
+  const grandTunggakan=DB.warga.reduce((s,w,i)=>{if(w.kosong)return s;return s+(6-getTotalBayar(i))*IURAN},0);
   html+=`<td class="total-cell">${rp(grandTotal)}</td>`;
-  html+=`<td class="tunggakan-cell">${rp(totalWarga*6*IURAN-grandTotal)}</td>`;
+  html+=`<td class="tunggakan-cell">${rp(grandTunggakan)}</td>`;
   html+=`</tr></tfoot></table></div>`;
 
   if(isAdmin){
