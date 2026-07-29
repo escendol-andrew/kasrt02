@@ -1093,6 +1093,13 @@ function renderKeuangan(){
 function renderTabelKeuangan(jenis,elementId){
   const txList=DB.transaksi.filter(t=>t.jenis===jenis);
   const kategoriMap={};
+  if(jenis==='masuk'){
+    for(var im=1;im<=12;im++){
+      var ib=0;
+      DB.warga.forEach(function(w,i){if(isPaid(i,im))ib+=getIuran(w)});
+      if(ib>0){if(!kategoriMap['Iuran Warga'])kategoriMap['Iuran Warga']={};kategoriMap['Iuran Warga'][im]=ib;}
+    }
+  }
   txList.forEach(t=>{
     const key=t.keterangan||'Lainnya';
     if(!kategoriMap[key])kategoriMap[key]={};
