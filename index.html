@@ -307,18 +307,24 @@ const TRANSAKSI_DEFAULT = [
 ];
 
 // ==================== STORAGE ====================
-const DB_KEY = 'rt_griya_satwika_v1';
+const DB_KEY = 'rt_griya_satwika_v2';
+const DB_VERSION = 2;
 
 function loadDB() {
   try {
     const d = localStorage.getItem(DB_KEY);
-    if (d) return JSON.parse(d);
+    if (d) {
+      const parsed = JSON.parse(d);
+      // Check version & data integrity
+      if (parsed._version === DB_VERSION && parsed.warga && parsed.warga.length > 10) return parsed;
+    }
   } catch(e) {}
   // Default: load dari data Excel
-  return { warga: WARGA_DEFAULT, transaksi: TRANSAKSI_DEFAULT };
+  return { _version: DB_VERSION, warga: WARGA_DEFAULT, transaksi: TRANSAKSI_DEFAULT };
 }
 
 function saveDB(d) {
+  d._version = DB_VERSION;
   localStorage.setItem(DB_KEY, JSON.stringify(d));
 }
 
