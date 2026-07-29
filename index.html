@@ -395,11 +395,22 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
     <!-- LAPORAN -->
     <div id="tab-laporan" class="hidden">
       <div class="card">
-        <h3>📋 Ringkasan Laporan Keuangan</h3>
-        <div id="laporan-content"></div>
-        <div style="margin-top:16px;text-align:center">
-          <button class="btn btn-primary" onclick="window.print()">🖨️ Cetak Laporan</button>
+        <h3>📋 Laporan Keuangan</h3>
+        <div class="filter-bar">
+          <select id="laporan-periode" onchange="renderLaporan()">
+            <option value="bulanan">📅 Per Bulan</option>
+            <option value="semester">📊 Per Semester (6 Bulan)</option>
+            <option value="tahunan">📈 Per Tahun</option>
+          </select>
+          <select id="laporan-bulan-start" onchange="renderLaporan()">
+            <option value="1">Januari</option><option value="2">Februari</option><option value="3">Maret</option>
+            <option value="4">April</option><option value="5">Mei</option><option value="6" selected>Juni</option>
+            <option value="7">Juli</option><option value="8">Agustus</option><option value="9">September</option>
+            <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Cetak</button>
         </div>
+        <div id="laporan-content"></div>
       </div>
     </div>
   </div>
@@ -968,6 +979,8 @@ function toggleBayar(idx,bulan){
   }
   saveDB(DB);
   renderTabel();
+  renderDashboard();
+  renderLaporan();
 }
 
 // ==================== KEUANGAN ====================
@@ -1057,7 +1070,7 @@ function savePemasukan(){
   const t=document.getElementById('tx-masuk-tanggal').value;
   if(!k||!j||!t){toast('⚠️ Semua field wajib diisi!');return}
   DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:k,jumlah:j,tanggal:t});
-  saveDB(DB);closeModal('modal-transaksi-masuk');renderKeuangan();toast('✅ Pemasukan ditambahkan');
+  saveDB(DB);closeModal('modal-transaksi-masuk');renderKeuangan();renderDashboard();renderLaporan();toast('✅ Pemasukan ditambahkan');
   document.getElementById('tx-masuk-keterangan').value='';document.getElementById('tx-masuk-jumlah').value='';document.getElementById('tx-masuk-tanggal').value='';
 }
 
@@ -1067,92 +1080,201 @@ function savePengeluaran(){
   const t=document.getElementById('tx-keluar-tanggal').value;
   if(!k||!j||!t){toast('⚠️ Semua field wajib diisi!');return}
   DB.transaksi.push({id:uid(),jenis:'keluar',keterangan:k,jumlah:j,tanggal:t});
-  saveDB(DB);closeModal('modal-transaksi-keluar');renderKeuangan();toast('✅ Pengeluaran ditambahkan');
+  saveDB(DB);closeModal('modal-transaksi-keluar');renderKeuangan();renderDashboard();renderLaporan();toast('✅ Pengeluaran ditambahkan');
   document.getElementById('tx-keluar-keterangan').value='';document.getElementById('tx-keluar-jumlah').value='';document.getElementById('tx-keluar-tanggal').value='';
 }
 
 function hapusTransaksi(id){
   if(!confirm('Yakin hapus transaksi ini?'))return;
   DB.transaksi=DB.transaksi.filter(t=>t.id!==id);
-  saveDB(DB);renderKeuangan();toast('🗑️ Transaksi dihapus');
+  saveDB(DB);renderKeuangan();renderDashboard();renderLaporan();toast('🗑️ Transaksi dihapus');
 }
 
 // ==================== LAPORAN ====================
 function renderLaporan(){
-  const totalIuran=DB.warga.reduce((s,w,i)=>s+getTotalBayar(i)*IURAN,0);
-  const totalMasuk=DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
-  const totalKeluar=DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
-  const saldoKas=totalIuran+totalMasuk-totalKeluar;
-  const totalWarga=DB.warga.length;
-  const totalKosong=DB.warga.filter(w=>w.kosong).length;
-  const sudahBayar=DB.warga.filter((w,i)=>getTotalBayar(i)>0&&!w.kosong).length;
-  const isAdmin=currentUser&&currentUser.role==='admin';
+  const periode = document.getElementById('laporan-periode').value;
+  const bulanStart = parseInt(document.getElementById('laporan-bulan-start').value);
+  const isAdmin = currentUser && currentUser.role === 'admin';
 
-  let html=`<div class="stats" style="margin-bottom:16px">
-    <div class="stat-card income"><div class="label">Iuran Masuk</div><div class="amount">${rp(totalIuran)}</div></div>
-    <div class="stat-card income"><div class="label">Pemasukan Lain</div><div class="amount">${rp(totalMasuk)}</div></div>
-    <div class="stat-card expense"><div class="label">Pengeluaran</div><div class="amount">${rp(totalKeluar)}</div></div>
-    <div class="stat-card info"><div class="label">Saldo Kas</div><div class="amount">${rp(saldoKas)}</div></div>
-  </div>
+  // Determine month range based on period
+  let months = [];
+  let labelPeriode = '';
+  if(periode === 'bulanan'){
+    months = [bulanStart];
+    labelPeriode = BLN_FULL[bulanStart-1] + ' ' + TAHUN;
+  } else if(periode === 'semester'){
+    const start = Math.ceil(bulanStart/6)*6 - 5;
+    months = [];
+    for(let m=start; m<start+6 && m<=12; m++) months.push(m);
+    labelPeriode = BLN_FULL[months[0]-1] + ' - ' + BLN_FULL[months[months.length-1]-1] + ' ' + TAHUN;
+  } else {
+    months = [1,2,3,4,5,6,7,8,9,10,11,12];
+    labelPeriode = 'Tahun ' + TAHUN;
+  }
 
-  <h3 style="margin:16px 0 10px;font-size:.95em">📊 Rekapitulasi per Bulan</h3>
-  <div class="table-wrap"><table><thead><tr><th style="text-align:left">Keterangan</th>`;
-  for(let m=1;m<=12;m++)html+=`<th>${BLN[m-1]}</th>`;
-  html+=`<th>TOTAL</th></tr></thead><tbody>`;
+  // Calculate totals for selected months
+  let totalIuran = 0, totalMasukLain = 0, totalKeluar = 0;
+  const iuranPerBulan = [], masukPerBulan = [], keluarPerBulan = [], saldoPerBulan = [];
 
-  // Iuran Masuk
-  html+=`<tr><td class="nama-cell">Iuran Masuk</td>`;
-  let tiRow=0;
-  for(let m=1;m<=12;m++){const v=DB.warga.filter((w,i)=>isPaid(i,m)).length*IURAN;tiRow+=v;html+=`<td style="color:var(--success);font-size:.82em">${rp(v)}</td>`}
-  html+=`<td class="total-cell">${rp(tiRow)}</td></tr>`;
-
-  // Pemasukan Lain
-  html+=`<tr><td class="nama-cell">Pemasukan Lain</td>`;
-  let tmRow=0;
-  for(let m=1;m<=12;m++){const v=DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);tmRow+=v;html+=`<td style="font-size:.82em">${v?rp(v):'—'}</td>`}
-  html+=`<td class="total-cell">${rp(tmRow)}</td></tr>`;
-
-  // Total Pemasukan
-  html+=`<tr style="background:#E8F5E9"><td class="nama-cell" style="font-weight:700">TOTAL PEMASUKAN</td>`;
-  let gm=0;
-  for(let m=1;m<=12;m++){const v=DB.warga.filter((w,i)=>isPaid(i,m)).length*IURAN+DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);gm+=v;html+=`<td style="font-weight:700;font-size:.82em">${rp(v)}</td>`}
-  html+=`<td class="total-cell">${rp(gm)}</td></tr>`;
-
-  // Pengeluaran per kategori
-  const kk={};
-  DB.transaksi.filter(t=>t.jenis==='keluar').forEach(t=>{const k=t.keterangan||'Lainnya';if(!kk[k])kk[k]={};const m=new Date(t.tanggal).getMonth()+1;kk[k][m]=(kk[k][m]||0)+t.jumlah});
-  Object.keys(kk).sort().forEach(kat=>{
-    html+=`<tr><td class="nama-cell">📤 ${kat}</td>`;
-    let tk=0;
-    for(let m=1;m<=12;m++){const v=kk[kat][m]||0;tk+=v;html+=`<td style="color:var(--danger);font-size:.82em">${v?rp(v):'—'}</td>`}
-    html+=`<td class="tunggakan-cell">${rp(tk)}</td></tr>`;
+  months.forEach(m => {
+    const iuran = DB.warga.filter((w,i) => isPaid(i,m)).length * IURAN;
+    const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+    const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+    totalIuran += iuran;
+    totalMasukLain += masuk;
+    totalKeluar += keluar;
+    iuranPerBulan.push(iuran);
+    masukPerBulan.push(masuk);
+    keluarPerBulan.push(keluar);
+    saldoPerBulan.push(iuran + masuk - keluar);
   });
 
-  // Total Pengeluaran
-  html+=`<tr style="background:#FFEBEE"><td class="nama-cell" style="font-weight:700">TOTAL PENGELUARAN</td>`;
-  let gk=0;
-  for(let m=1;m<=12;m++){const v=DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);gk+=v;html+=`<td style="font-weight:700;color:var(--danger);font-size:.82em">${v?rp(v):'—'}</td>`}
-  html+=`<td class="tunggakan-cell">${rp(gk)}</td></tr>`;
+  const totalPemasukan = totalIuran + totalMasukLain;
+  const saldoKas = totalPemasukan - totalKeluar;
+  const totalWarga = DB.warga.length;
+  const totalKosong = DB.warga.filter(w => w.kosong).length;
+  const totalAktif = totalWarga - totalKosong;
 
-  // Saldo
-  html+=`<tr style="background:#E3F2FD"><td class="nama-cell" style="font-weight:700">SALDO</td>`;
-  let sb=0;
-  for(let m=1;m<=12;m++){const i=DB.warga.filter((w,ix)=>isPaid(ix,m)).length*IURAN;const mi=DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);const ke=DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);sb+=i+mi-ke;html+=`<td style="font-weight:700;font-size:.82em">${rp(sb)}</td>`}
-  html+=`<td style="font-weight:700;color:var(--info)">${rp(saldoKas)}</td></tr>`;
+  // Warga stats for selected months
+  let sudahBayarCount = 0, belumBayarCount = 0;
+  if(periode === 'bulanan'){
+    sudahBayarCount = DB.warga.filter((w,i) => isPaid(i, months[0]) && !w.kosong).length;
+    belumBayarCount = totalAktif - sudahBayarCount;
+  } else {
+    // For semester/year: count warga who paid at least once in the period
+    sudahBayarCount = DB.warga.filter((w,i) => {
+      if(w.kosong) return false;
+      return months.some(m => isPaid(i,m));
+    }).length;
+    belumBayarCount = totalAktif - sudahBayarCount;
+  }
 
-  html+=`</tbody></table></div>`;
+  // Total tunggakan for selected months
+  let totalTunggakan = 0;
+  DB.warga.forEach((w,i) => {
+    if(w.kosong) return;
+    months.forEach(m => { if(!isPaid(i,m)) totalTunggakan += IURAN; });
+  });
 
-  html+=`<h3 style="margin:16px 0 10px;font-size:.95em">📋 Rekapitulasi</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88em">
-    <div>Total Warga: <strong>${totalWarga}</strong> (${totalKosong} kosong)</div>
-    <div>Warga Aktif: <strong>${totalWarga-totalKosong}</strong></div>
-    <div>Sudah Bayar: <strong>${sudahBayar}</strong></div>
-    <div>Belum Bayar: <strong>${totalWarga-totalKosong-sudahBayar}</strong></div>
-    <div>Iuran/bulan: <strong>${rp(IURAN)}</strong></div>
-    <div>Periode: <strong>Jan-Jun ${TAHUN}</strong></div>
-  </div>`;
+  // Build HTML
+  let html = `
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat-card income"><div class="label">Total Pemasukan</div><div class="amount">${rp(totalPemasukan)}</div></div>
+      <div class="stat-card expense"><div class="label">Total Pengeluaran</div><div class="amount">${rp(totalKeluar)}</div></div>
+      <div class="stat-card info"><div class="label">Saldo Kas</div><div class="amount">${rp(saldoKas)}</div></div>
+      <div class="stat-card warning"><div class="label">Tunggakan</div><div class="amount">${rp(totalTunggakan)}</div></div>
+    </div>
+    <div style="text-align:center;margin-bottom:14px;font-size:.85em;color:var(--text-light)">Periode: <strong>${labelPeriode}</strong></div>
+  `;
 
-  document.getElementById('laporan-content').innerHTML=html;
+  // Detail table
+  html += `<h3 style="margin:16px 0 10px;font-size:.95em">📊 Detail per Bulan</h3>`;
+  html += `<div class="table-wrap"><table><thead><tr><th style="text-align:left">Keterangan</th>`;
+  months.forEach(m => html += `<th>${BLN[m-1]}</th>`);
+  if(months.length > 1) html += `<th>TOTAL</th>`;
+  html += `</tr></thead><tbody>`;
+
+  // Row: Jumlah Warga Bayar
+  html += `<tr><td class="nama-cell">Warga Bayar</td>`;
+  months.forEach((m,i) => {
+    const mc = DB.warga.filter((w,ix) => isPaid(ix,m)).length;
+    html += `<td>${mc} dari ${totalWarga}</td>`;
+  });
+  if(months.length > 1) html += `<td style="font-weight:700">${sudahBayarCount} warga</td>`;
+  html += `</tr>`;
+
+  // Row: Iuran Masuk
+  html += `<tr><td class="nama-cell">Iuran Masuk</td>`;
+  iuranPerBulan.forEach(v => html += `<td style="color:var(--success)">${rp(v)}</td>`);
+  if(months.length > 1) html += `<td class="total-cell">${rp(totalIuran)}</td>`;
+  html += `</tr>`;
+
+  // Row: Pemasukan Lain
+  html += `<tr><td class="nama-cell">Pemasukan Lain</td>`;
+  masukPerBulan.forEach(v => html += `<td>${v ? rp(v) : '—'}</td>`);
+  if(months.length > 1) html += `<td class="total-cell">${rp(totalMasukLain)}</td>`;
+  html += `</tr>`;
+
+  // Row: Total Pemasukan
+  html += `<tr style="background:#E8F5E9"><td class="nama-cell" style="font-weight:700">TOTAL PEMASUKAN</td>`;
+  iuranPerBulan.forEach((v,i) => html += `<td style="font-weight:700">${rp(v + masukPerBulan[i])}</td>`);
+  if(months.length > 1) html += `<td class="total-cell">${rp(totalPemasukan)}</td>`;
+  html += `</tr>`;
+
+  // Pengeluaran per kategori
+  const kk = {};
+  DB.transaksi.filter(t => t.jenis==='keluar').forEach(t => {
+    const m = new Date(t.tanggal).getMonth()+1;
+    if(!months.includes(m)) return;
+    const k = t.keterangan || 'Lainnya';
+    if(!kk[k]) kk[k] = {};
+    kk[k][m] = (kk[k][m]||0) + t.jumlah;
+  });
+  Object.keys(kk).sort().forEach(kat => {
+    html += `<tr><td class="nama-cell">📤 ${kat}</td>`;
+    let tk = 0;
+    months.forEach(m => {
+      const v = kk[kat][m] || 0;
+      tk += v;
+      html += `<td style="color:var(--danger)">${v ? rp(v) : '—'}</td>`;
+    });
+    if(months.length > 1) html += `<td class="tunggakan-cell">${rp(tk)}</td>`;
+    html += `</tr>`;
+  });
+
+  // Row: Total Pengeluaran
+  html += `<tr style="background:#FFEBEE"><td class="nama-cell" style="font-weight:700">TOTAL PENGELUARAN</td>`;
+  keluarPerBulan.forEach(v => html += `<td style="font-weight:700;color:var(--danger)">${v ? rp(v) : '—'}</td>`);
+  if(months.length > 1) html += `<td class="tunggakan-cell">${rp(totalKeluar)}</td>`;
+  html += `</tr>`;
+
+  // Row: Saldo
+  html += `<tr style="background:#E3F2FD"><td class="nama-cell" style="font-weight:700">SALDO</td>`;
+  let saldoRun = 0;
+  saldoPerBulan.forEach(v => { saldoRun += v; html += `<td style="font-weight:700">${rp(saldoRun)}</td>`; });
+  if(months.length > 1) html += `<td style="font-weight:700;color:var(--info)">${rp(saldoKas)}</td>`;
+  html += `</tr>`;
+
+  html += `</tbody></table></div>`;
+
+  // Rekapitulasi
+  html += `
+    <h3 style="margin:16px 0 10px;font-size:.95em">📋 Rekapitulasi</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88em">
+      <div>Total Warga: <strong>${totalWarga}</strong> (${totalKosong} kosong)</div>
+      <div>Warga Aktif: <strong>${totalAktif}</strong></div>
+      <div>Sudah Bayar: <strong>${sudahBayarCount}</strong></div>
+      <div>Belum Bayar: <strong>${belumBayarCount}</strong></div>
+      <div>Iuran/bulan: <strong>${rp(IURAN)}</strong></div>
+      <div>Periode: <strong>${labelPeriode}</strong></div>
+    </div>
+  `;
+
+  // Tabel rekap warga per bulan (hanya untuk semester/tahunan)
+  if(months.length > 1 && isAdmin){
+    html += `<h3 style="margin:16px 0 10px;font-size:.95em">👥 Rekap Iuran Warga ${labelPeriode}</h3>`;
+    html += `<div class="table-wrap"><table><thead><tr><th>No</th><th style="text-align:left">Nama</th><th>Blok</th>`;
+    months.forEach(m => html += `<th>${BLN[m-1]}</th>`);
+    html += `<th>Bayar</th><th>Tunggakan</th></tr></thead><tbody>`;
+
+    DB.warga.forEach((w,i) => {
+      if(w.kosong) return;
+      let bayar = 0;
+      html += `<tr><td>${w.no}</td><td class="nama-cell">${w.nama}</td><td class="blok-cell">${w.blok}</td>`;
+      months.forEach(m => {
+        const paid = isPaid(i,m);
+        if(paid) bayar++;
+        html += `<td>${paid ? '<span class="check">✔</span>' : '<span class="cross">✘</span>'}</td>`;
+      });
+      const tunggakanWarga = (months.length - bayar) * IURAN;
+      html += `<td class="total-cell">${rp(bayar * IURAN)}</td>`;
+      html += `<td class="tunggakan-cell">${rp(tunggakanWarga)}</td></tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+  }
+
+  document.getElementById('laporan-content').innerHTML = html;
 }
 
 // ==================== EXPORT ====================
