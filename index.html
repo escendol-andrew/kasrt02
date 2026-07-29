@@ -933,7 +933,7 @@ function renderTabel(){
       if(w.kosong){
         html+=`<td style="color:#ccc">—</td>`;
       } else if(paid){
-        html+=`<td><span class="check">✔</span></td>`;
+        html+=`<td><span class="cross-clickable" onclick="toggleBayar(${w.idx},${m})" style="color:var(--success)">✔</span></td>`;
       } else if(isAdmin){
         html+=`<td><span class="cross-clickable" onclick="toggleBayar(${w.idx},${m})">✘</span></td>`;
       } else {
