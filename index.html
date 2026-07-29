@@ -994,7 +994,7 @@ function renderTabel(){
 
 function openEditBayar(idx){
   const w=DB.warga[idx];
-  if(!w||w.kosong)return;
+  if(!w)return;
   document.getElementById('edit-bayar-idx').value=idx;
   document.getElementById('edit-bayar-info').textContent=`${w.nama} (${w.blok}) — ${rp(getIuran(w))}/bulan`;
   document.getElementById('edit-bayar-nama').value=w.nama;
@@ -1045,7 +1045,7 @@ function saveEditBayar(){
 function toggleBayar(idx,bulan){
   if(!currentUser||currentUser.role!=='admin')return;
   const w=DB.warga[idx];
-  if(!w||w.kosong)return;
+  if(!w)return;
 
   if(w.bayar[bulan]===1){
     if(!confirm(`Hapus pembayaran ${BLN_FULL[bulan-1]} ${TAHUN} untuk ${w.nama}?`))return;
