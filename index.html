@@ -470,6 +470,8 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
     <h3>✏️ Edit Pembayaran Iuran</h3>
     <input type="hidden" id="edit-bayar-idx">
     <p id="edit-bayar-info" style="margin-bottom:14px;font-size:.95em;font-weight:600;color:var(--primary)"></p>
+    <div class="form-group"><label>👤 Nama Pemilik Rumah</label><input type="text" id="edit-bayar-nama" placeholder="Nama warga"></div>
+    <h4 style="font-size:.88em;margin-bottom:8px">📅 Status Pembayaran Bulanan</h4>
     <div id="edit-bayar-checks" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-outline" onclick="closeModal('modal-edit-bayar')">Batal</button>
@@ -991,6 +993,7 @@ function openEditBayar(idx){
   if(!w||w.kosong)return;
   document.getElementById('edit-bayar-idx').value=idx;
   document.getElementById('edit-bayar-info').textContent=`${w.nama} (${w.blok}) — ${rp(getIuran(w))}/bulan`;
+  document.getElementById('edit-bayar-nama').value=w.nama;
   
   let html='';
   for(let m=1;m<=12;m++){
@@ -1009,6 +1012,11 @@ function saveEditBayar(){
   const w=DB.warga[idx];
   if(!w)return;
   
+  // Update nama
+  const namaBaru=document.getElementById('edit-bayar-nama').value.trim();
+  if(namaBaru) w.nama=namaBaru;
+  
+  // Update pembayaran
   for(let m=1;m<=12;m++){
     const cb=document.getElementById('eb-'+m);
     if(cb.checked){
@@ -1023,7 +1031,7 @@ function saveEditBayar(){
   renderTabel();
   renderDashboard();
   renderLaporan();
-  toast(`✅ Pembayaran ${w.nama} diperbarui`);
+  toast(`✅ Data ${w.nama} diperbarui`);
 }
 
 function toggleBayar(idx,bulan){
