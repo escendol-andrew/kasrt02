@@ -9,6 +9,7 @@
 <title>RT 02/RW 014 — Griya Satwika Telkom</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#1B5E20;--primary-light:#2E7D32;--primary-dark:#0D3B13;--accent:#FFD700;--bg:#F0F2F5;--card:#FFF;--text:#1a1a2e;--text-light:#6c757d;--danger:#DC3545;--success:#28A745;--warning:#FFC107;--info:#17A2B8;--check:#28A745;--cross:#DC3545;--yellow:#FFF9C4;--border:#dee2e6;--shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -201,6 +202,17 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
       <button class="btn-login" onclick="doLoginWarga()">👤 Lihat Laporan Saya</button>
     </div>
 
+    <div id="supabase-config" style="margin-bottom:16px;padding:14px;background:#E3F2FD;border-radius:10px;font-size:.82em">
+      <strong>☁️ Sinkronisasi Cloud</strong>
+      <p style="color:#666;margin:6px 0;font-size:.9em">Supaya semua warga lihat data sama</p>
+      <div class="form-group" style="margin-top:8px">
+        <input type="text" id="cfg-url" placeholder="Project URL (https://xxx.supabase.co)" style="font-size:.9em">
+      </div>
+      <div class="form-group">
+        <input type="text" id="cfg-key" placeholder="API Key" style="font-size:.9em">
+      </div>
+      <button class="btn-login" style="padding:10px;font-size:.85em;margin-top:4px" onclick="saveSupabaseCfg()">💾 Simpan & Sinkron</button>
+    </div>
     <div class="login-info">
       <strong>🔐 Admin:</strong> Bisa edit data pembayaran semua warga<br>
       <strong>👤 Warga:</strong> Hanya bisa lihat laporan sendiri<br><br>
@@ -581,6 +593,12 @@ const WARGA_DEFAULT = [
 ];
 const TRANSAKSI_DEFAULT = [];
 
+// ==================== SUPABASE ====================
+const _supaCfg = JSON.parse(localStorage.getItem('rt_supabase_cfg') || '{}');
+const SUPABASE_URL = _supaCfg.url || '';
+const SUPABASE_KEY = _supaCfg.key || '';
+const supabase = (SUPABASE_URL && SUPABASE_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
 // ==================== STORAGE ====================
 const DB_KEY = 'rt_griya_satwika_v5';
 const DB_VERSION = 6;
@@ -592,8 +610,42 @@ function loadDB(){
   }catch(e){}
   return{_version:DB_VERSION,warga:WARGA_DEFAULT,transaksi:TRANSAKSI_DEFAULT};
 }
-function saveDB(d){d._version=DB_VERSION;localStorage.setItem(DB_KEY,JSON.stringify(d))}
-let DB=loadDB();
+function saveDB(d){
+  d._version=DB_VERSION;
+  localStorage.setItem(DB_KEY,JSON.stringify(d));
+  syncToSupabase(d);
+}
+
+async function syncToSupabase(data){
+  if(!supabase) return;
+  try {
+    await supabase.from('settings').upsert({key:'tahun',value:TAHUN},{onConflict:'key'});
+    await supabase.from('settings').upsert({key:'iuran_normal',value:IURAN},{onConflict:'key'});
+    await supabase.from('settings').upsert({key:'iuran_kosong',value:IURAN_KOSONG},{onConflict:'key'});
+    const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
+    await supabase.from('warga').delete().neq('id',0);
+    if(wargaRows.length > 0) await supabase.from('warga').insert(wargaRows);
+    const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
+    await supabase.from('transaksi').delete().neq('id',0);
+    if(txRows.length > 0) await supabase.from('transaksi').insert(txRows);
+  } catch(e) { console.log('Supabase sync error:', e.message); }
+}
+
+async function loadFromSupabase(){
+  if(!supabase) return null;
+  try {
+    const {data: warga} = await supabase.from('warga').select('*').order('no');
+    const {data: tx} = await supabase.from('transaksi').select('*');
+    if(!warga || warga.length === 0) return null;
+    return {
+      _version: DB_VERSION,
+      warga: warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false})),
+      transaksi: (tx||[]).map(t => ({id:t.uid,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}))
+    };
+  } catch(e) { console.log('Supabase load error:', e.message); return null; }
+}
+
+let DB = loadDB();
 
 // ==================== SESSION ====================
 let currentUser = null; // {role:'admin'} or {role:'warga', idx:28}
@@ -623,6 +675,24 @@ function doLoginAdmin(){
   }
 }
 
+function saveSupabaseCfg(){
+  const url = document.getElementById('cfg-url').value.trim();
+  const key = document.getElementById('cfg-key').value.trim();
+  if(!url || !key) { toast('⚠️ Isi URL dan API Key dulu!'); return; }
+  localStorage.setItem('rt_supabase_cfg', JSON.stringify({url:url, key:key}));
+  toast('✅ Tersimpan! Refresh halaman...');
+  setTimeout(() => location.reload(), 800);
+}
+
+// Hide supabase config if already set
+(function(){
+  const cfg = localStorage.getItem('rt_supabase_cfg');
+  if(cfg) {
+    const el = document.getElementById('supabase-config');
+    if(el) el.style.display = 'none';
+  }
+})();
+
 function doLoginWarga(){
   const idx=parseInt(document.getElementById('warga-select').value);
   if(isNaN(idx)){toast('⚠️ Pilih nama dulu!');return}
@@ -637,9 +707,18 @@ function doLogout(){
   document.getElementById('admin-pass').value='';
 }
 
-function enterApp(){
+async function enterApp(){
   document.getElementById('login-page').style.display='none';
   document.getElementById('app').style.display='block';
+  document.getElementById('user-badge').textContent='⏳ Syncing...';
+
+  // Load from Supabase first (server is source of truth)
+  const supaDB = await loadFromSupabase();
+  if(supaDB && supaDB.warga && supaDB.warga.length > 0) {
+    DB = supaDB;
+    localStorage.setItem(DB_KEY, JSON.stringify(DB));
+    toast('☁️ Data dari server dimuat!');
+  }
 
   const isAdmin=currentUser.role==='admin';
   document.getElementById('user-badge').textContent=isAdmin?'🔐 Admin':'👤 '+DB.warga[currentUser.idx].nama;
