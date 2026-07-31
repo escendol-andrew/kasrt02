@@ -1305,92 +1305,47 @@ function hapusTransaksi(id){
 
 // ==================== LAPORAN ====================
 function showPreviewPDF(periode) {
-  // Get current filter values
-  const curPeriode = document.getElementById('laporan-periode').value;
-  const curBulan = document.getElementById('laporan-bulan-start').value;
-  
-  // Set to requested period
+  // Set filter to requested period
   document.getElementById('laporan-periode').value = periode;
-  if (periode === 'bulanan') {
-    // Keep current month selection
-  } else if (periode === 'semester') {
-    document.getElementById('laporan-bulan-start').value = '1';
-  } else {
-    document.getElementById('laporan-bulan-start').value = '1';
-  }
+  if (periode === 'semester') document.getElementById('laporan-bulan-start').value = '1';
+  if (periode === 'tahunan') document.getElementById('laporan-bulan-start').value = '1';
   
   // Generate laporan
   renderLaporan();
   const laporanHTML = document.getElementById('laporan-content').innerHTML;
   
-  // Restore original filter
-  document.getElementById('laporan-periode').value = curPeriode;
-  document.getElementById('laporan-bulan-start').value = curBulan;
-  renderLaporan();
+  // Get label
+  const periodeEl = document.getElementById('laporan-periode');
+  const label = periodeEl.options[periodeEl.selectedIndex].text;
   
-  // Label
-  let label = '';
-  if (periode === 'bulanan') {
-    label = BLN_FULL[parseInt(curBulan)-1] + ' ' + TAHUN;
-  } else if (periode === 'semester') {
-    label = 'Semester ' + TAHUN;
-  } else {
-    label = 'Tahun ' + TAHUN;
-  }
+  // Show modal
+  let old = document.getElementById('pdfPreviewModal');
+  if (old) old.remove();
   
-  // Show modal preview
-  let modal = document.getElementById('pdfPreviewModal');
-  if (modal) modal.remove();
-  
-  modal = document.createElement('div');
+  const modal = document.createElement('div');
   modal.id = 'pdfPreviewModal';
   modal.className = 'modal-overlay show';
-  modal.innerHTML = `
-    <div class="modal" style="max-width:900px;max-height:90vh">
-      <div class="modal-header">
-        <h3>📄 Preview: Laporan ${label}</h3>
-        <button class="modal-close" onclick="document.getElementById('pdfPreviewModal').remove()">✕</button>
-      </div>
-      <div class="modal-body" style="padding:0;overflow:hidden">
-        <div id="pdfPreviewContent" style="max-height:55vh;overflow-y:auto;padding:15px;background:#fff">${laporanHTML}</div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="document.getElementById('pdfPreviewModal').remove()">❌ Tutup</button>
-        <button class="btn btn-primary" onclick="downloadPDF('${periode}')">📥 Download PDF</button>
-      </div>
-    </div>
-  `;
+  modal.innerHTML = '<div class="modal" style="max-width:900px;max-height:90vh">' +
+    '<div class="modal-header">' +
+      '<h3>📄 Preview Laporan ' + label + '</h3>' +
+      '<button class="modal-close" onclick="document.getElementById(\'pdfPreviewModal\').remove()">✕</button>' +
+    '</div>' +
+    '<div class="modal-body" style="padding:0">' +
+      '<div style="max-height:55vh;overflow-y:auto;padding:15px;background:#fff">' + laporanHTML + '</div>' +
+    '</div>' +
+    '<div class="modal-footer">' +
+      '<button class="btn btn-outline" onclick="document.getElementById(\'pdfPreviewModal\').remove()">❌ Tutup</button>' +
+      '<button class="btn btn-primary" onclick="downloadPDF()">📥 Download PDF</button>' +
+    '</div>' +
+  '</div>';
   document.body.appendChild(modal);
 }
 
-function downloadPDF(periode) {
-  const curPeriode = document.getElementById('laporan-periode').value;
-  const curBulan = document.getElementById('laporan-bulan-start').value;
-  
-  document.getElementById('laporan-periode').value = periode;
-  if (periode === 'semester') document.getElementById('laporan-bulan-start').value = '1';
-  if (periode === 'tahunan') document.getElementById('laporan-bulan-start').value = '1';
-  
-  renderLaporan();
+function downloadPDF() {
   const laporanHTML = document.getElementById('laporan-content').innerHTML;
-  
-  document.getElementById('laporan-periode').value = curPeriode;
-  document.getElementById('laporan-bulan-start').value = curBulan;
-  renderLaporan();
-  
-  let label = '';
-  let filename = 'Laporan_Keuangan_RT02';
-  if (periode === 'bulanan') {
-    label = BLN_FULL[parseInt(curBulan)-1] + ' ' + TAHUN;
-    filename += '_' + BLN_FULL[parseInt(curBulan)-1] + '_' + TAHUN;
-  } else if (periode === 'semester') {
-    label = 'Semester ' + TAHUN;
-    filename += '_Semester_' + TAHUN;
-  } else {
-    label = 'Tahun ' + TAHUN;
-    filename += '_Tahunan_' + TAHUN;
-  }
-  filename += '.pdf';
+  const periodeEl = document.getElementById('laporan-periode');
+  const label = periodeEl.options[periodeEl.selectedIndex].text;
+  const filename = 'Laporan_Keuangan_RT02_' + label.replace(/\s+/g,'_') + '.pdf';
   
   const container = document.createElement('div');
   container.innerHTML = `
