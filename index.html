@@ -617,17 +617,34 @@ function saveDB(d){
 }
 
 async function syncToSupabase(data){
-  if(!supabase) return;
+  if(!supabase) { console.log('Supabase not configured'); return; }
   try {
-    await supabase.from('settings').upsert({key:'tahun',value:TAHUN},{onConflict:'key'});
+    // Settings
+    let r = await supabase.from('settings').upsert({key:'tahun',value:TAHUN},{onConflict:'key'});
+    if(r.error) console.log('Settings error:', r.error.message);
     await supabase.from('settings').upsert({key:'iuran_normal',value:IURAN},{onConflict:'key'});
     await supabase.from('settings').upsert({key:'iuran_kosong',value:IURAN_KOSONG},{onConflict:'key'});
+    // Warga - delete all first, then insert
     const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
-    await supabase.from('warga').delete().neq('id',0);
-    if(wargaRows.length > 0) await supabase.from('warga').insert(wargaRows);
+    let delW = await supabase.from('warga').delete().gte('id',1);
+    if(delW.error) console.log('Delete warga error:', delW.error.message);
+    if(wargaRows.length > 0) {
+      // Insert in batches of 20
+      for(let i=0; i<wargaRows.length; i+=20) {
+        let batch = wargaRows.slice(i, i+20);
+        let ins = await supabase.from('warga').insert(batch);
+        if(ins.error) console.log('Insert warga error:', ins.error.message);
+      }
+    }
+    // Transaksi
     const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
-    await supabase.from('transaksi').delete().neq('id',0);
-    if(txRows.length > 0) await supabase.from('transaksi').insert(txRows);
+    let delT = await supabase.from('transaksi').delete().gte('id',1);
+    if(delT.error) console.log('Delete transaksi error:', delT.error.message);
+    if(txRows.length > 0) {
+      let ins = await supabase.from('transaksi').insert(txRows);
+      if(ins.error) console.log('Insert transaksi error:', ins.error.message);
+    }
+    console.log('Supabase sync done: ' + wargaRows.length + ' warga, ' + txRows.length + ' transaksi');
   } catch(e) { console.log('Supabase sync error:', e.message); }
 }
 
@@ -721,8 +738,20 @@ async function enterApp(){
   } else if(supabase && DB.warga && DB.warga.length > 0) {
     // Supabase kosong → push data lokal ke server
     toast('☁️ Mengupload data ke server...');
-    await syncToSupabase(DB);
-    toast('✅ Data berhasil diupload ke cloud!');
+    try {
+      await syncToSupabase(DB);
+      // Verify upload
+      const verify = await loadFromSupabase();
+      if(verify && verify.warga && verify.warga.length > 0) {
+        toast('✅ ' + verify.warga.length + ' warga berhasil diupload!');
+      } else {
+        toast('⚠️ Upload gagal. Cek console (F12) untuk detail.');
+      }
+    } catch(e) {
+      toast('❌ Error: ' + e.message);
+    }
+  } else if(!supabase) {
+    toast('⚠️ Supabase belum dikonfigurasi.');
   }
 
   const isAdmin=currentUser.role==='admin';
