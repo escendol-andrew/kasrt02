@@ -8,8 +8,6 @@
 <meta http-equiv="Expires" content="0">
 <title>RT 02/RW 014 — Griya Satwika Telkom</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script>/* datalabels registered per-chart, not globally */</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#1B5E20;--primary-light:#2E7D32;--primary-dark:#0D3B13;--accent:#FFD700;--bg:#F0F2F5;--card:#FFF;--text:#1a1a2e;--text-light:#6c757d;--danger:#DC3545;--success:#28A745;--warning:#FFC107;--info:#17A2B8;--check:#28A745;--cross:#DC3545;--yellow:#FFF9C4;--border:#dee2e6;--shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -665,6 +663,32 @@ function showTab(t){
 
 // ==================== DASHBOARD ====================
 let chartPie, chartBar, chartCashflow, chartTop, chartWargaPie, chartWargaBar;
+Chart.register(piePercentPlugin);
+
+// Custom plugin: draw percentage on doughnut charts
+const piePercentPlugin = {
+  id: 'piePercent',
+  afterDraw(chart) {
+    if (chart.config.type !== 'doughnut') return;
+    const {ctx, data} = chart;
+    const meta = chart.getDatasetMeta(0);
+    const total = data.datasets[0].data.reduce((a,b)=>a+b, 0);
+    if (!total) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px sans-serif';
+    meta.data.forEach((arc, i) => {
+      const val = data.datasets[0].data[i];
+      const pct = Math.round(val / total * 100);
+      if (pct < 5) return;
+      const pos = arc.tooltipPosition();
+      ctx.fillText(pct + '%', pos.x, pos.y);
+    });
+    ctx.restore();
+  }
+};
 
 function renderDashboard(){
   const isAdmin = currentUser && currentUser.role === 'admin';
@@ -717,7 +741,7 @@ function renderDashboardAdmin(){
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: [ChartDataLabels, {
+      plugins: {
         legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
@@ -727,17 +751,6 @@ function renderDashboardAdmin(){
               return ctx.label + ': ' + ctx.raw + ' warga (' + pct + '%)';
             }
           }
-        }
-      }],
-      // @ts-ignore
-      datalabels: {
-        color: '#fff',
-        font: { weight: 'bold', size: 14 },
-        formatter: function(value, ctx) {
-          const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
-          const pct = Math.round(value/total*100);
-          if (pct < 5) return '';
-          return pct + '%';
         }
       }
     }
@@ -878,7 +891,7 @@ function renderDashboardWarga(){
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: [ChartDataLabels, {
+      plugins: {
         legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
@@ -887,17 +900,6 @@ function renderDashboardWarga(){
               return ctx.label + ': ' + ctx.raw + ' bulan (' + pct + '%)';
             }
           }
-        }
-      }],
-      // @ts-ignore
-      datalabels: {
-        color: '#fff',
-        font: { weight: 'bold', size: 14 },
-        formatter: function(value, ctx) {
-          const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
-          const pct = Math.round(value/total*100);
-          if (pct < 5) return '';
-          return pct + '%';
         }
       }
     }
