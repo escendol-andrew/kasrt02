@@ -1052,22 +1052,20 @@ function saveEditBayar(){
   // Update status kosong
   w.kosong=document.getElementById('edit-bayar-kosong').checked;
   
-  // Hapus transaksi iuran lama untuk warga ini
-  DB.transaksi=DB.transaksi.filter(t=>!(t.ref==='iuran'&&t.wargaIdx===idx));
-  
-  // Update pembayaran & sinkron ke jurnal
+  // Update pembayaran & catat bulan yang berubah
+  const changedMonths=[];
   for(let m=1;m<=12;m++){
     const cb=document.getElementById('eb-'+m);
+    const wasPaid=isPaid(idx,m);
     if(cb.checked){
       w.bayar[m]=1;
-      // Tambah ke jurnal umum
-      const iuran=getIuran(w,m);
-      const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
-      DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:m});
     } else {
       delete w.bayar[m];
     }
+    if(cb.checked!==wasPaid) changedMonths.push(m);
   }
+  // Update jurnal untuk bulan yang berubah
+  changedMonths.forEach(m=>updateJurnalBulan(m));
   
   saveDB(DB);
   closeModal('modal-edit-bayar');
@@ -1087,14 +1085,10 @@ function bayarIuran(){
   if(!selectedMonths.length){toast('⚠️ Pilih bulan terlebih dahulu!');return}
   
   selectedMonths.forEach(m=>{
-    if(w.bayar[m]!==1){
-      w.bayar[m]=1;
-      // Tambah ke jurnal umum
-      const iuran=getIuran(w,m);
-      const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
-      DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:m});
-    }
+    if(w.bayar[m]!==1) w.bayar[m]=1;
   });
+  // Update jurnal per bulan yang berubah
+  selectedMonths.forEach(m=>updateJurnalBulan(m));
   
   saveDB(DB);
   closeModal('modal-bayar');
@@ -1113,17 +1107,13 @@ function toggleBayar(idx,bulan){
   if(w.bayar[bulan]===1){
     if(!confirm(`Hapus pembayaran ${BLN_FULL[bulan-1]} ${TAHUN} untuk ${w.nama}?`))return;
     delete w.bayar[bulan];
-    // Hapus dari jurnal umum
-    DB.transaksi=DB.transaksi.filter(t=>!(t.ref==='iuran'&&t.wargaIdx===idx&&t.bulan===bulan));
     toast(`❌ ${BLN_FULL[bulan-1]} ${w.nama} dibatalkan`);
   } else {
     w.bayar[bulan]=1;
-    // Tambah ke jurnal umum
-    const iuran=getIuran(w,bulan);
-    const tgl=new Date(TAHUN,bulan-1,1).toISOString().slice(0,10);
-    DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[bulan-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:bulan});
     toast(`✅ ${BLN_FULL[bulan-1]} ${w.nama} terbayar`);
   }
+  // Update jurnal bulan ini
+  updateJurnalBulan(bulan);
   saveDB(DB);
   renderTabel();
   renderDashboard();
@@ -1132,24 +1122,40 @@ function toggleBayar(idx,bulan){
 }
 
 // ==================== KEUANGAN ====================
+function updateJurnalBulan(bulan){
+  // Hitung total iuran bulan ini
+  let total=0;
+  DB.warga.forEach(function(w,idx){
+    if(isPaid(idx,bulan)) total+=getIuran(w,bulan);
+  });
+  // Hapus entry lama bulan ini
+  DB.transaksi=DB.transaksi.filter(t=>!(t.ref==='iuran'&&t.bulan===bulan));
+  // Tambah entry baru jika ada pembayaran
+  if(total>0){
+    const tgl=new Date(TAHUN,bulan-1,1).toISOString().slice(0,10);
+    DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran Warga ${BLN_FULL[bulan-1]} ${TAHUN}`,jumlah:total,tanggal:tgl,ref:'iuran',bulan:bulan});
+  }
+}
+
 function syncIuranKeJurnal(){
   // Hapus semua transaksi iuran lama
   DB.transaksi=DB.transaksi.filter(t=>t.ref!=='iuran');
-  // Buat ulang dari data pembayaran
-  DB.warga.forEach(function(w,idx){
-    for(let m=1;m<=12;m++){
-      if(isPaid(idx,m)){
-        const iuran=getIuran(w,m);
-        const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
-        DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:m});
-      }
+  // Hitung total iuran per bulan
+  for(let m=1;m<=12;m++){
+    let totalBulan=0;
+    DB.warga.forEach(function(w,idx){
+      if(isPaid(idx,m)) totalBulan+=getIuran(w,m);
+    });
+    if(totalBulan>0){
+      const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
+      DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran Warga ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:totalBulan,tanggal:tgl,ref:'iuran',bulan:m});
     }
-  });
+  }
   saveDB(DB);
   renderKeuangan();
   renderDashboard();
   renderLaporan();
-  toast('✅ Semua data iuran berhasil disinkronkan ke jurnal umum');
+  toast('✅ Data iuran berhasil disinkronkan ke jurnal umum');
 }
 
 function renderKeuangan(){
