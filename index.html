@@ -597,7 +597,7 @@ const TRANSAKSI_DEFAULT = [];
 const _supaCfg = JSON.parse(localStorage.getItem('rt_supabase_cfg') || '{}');
 const SUPABASE_URL = _supaCfg.url || '';
 const SUPABASE_KEY = _supaCfg.key || '';
-const supabase = (SUPABASE_URL && SUPABASE_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const supaClient = (SUPABASE_URL && SUPABASE_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 // ==================== STORAGE ====================
 const DB_KEY = 'rt_griya_satwika_v5';
@@ -617,31 +617,31 @@ function saveDB(d){
 }
 
 async function syncToSupabase(data){
-  if(!supabase) { console.log('Supabase not configured'); return; }
+  if(!supaClient) { console.log('Supabase not configured'); return; }
   try {
     // Settings
-    let r = await supabase.from('settings').upsert({key:'tahun',value:TAHUN},{onConflict:'key'});
+    let r = await supaClient.from('settings').upsert({key:'tahun',value:TAHUN},{onConflict:'key'});
     if(r.error) console.log('Settings error:', r.error.message);
-    await supabase.from('settings').upsert({key:'iuran_normal',value:IURAN},{onConflict:'key'});
-    await supabase.from('settings').upsert({key:'iuran_kosong',value:IURAN_KOSONG},{onConflict:'key'});
+    await supaClient.from('settings').upsert({key:'iuran_normal',value:IURAN},{onConflict:'key'});
+    await supaClient.from('settings').upsert({key:'iuran_kosong',value:IURAN_KOSONG},{onConflict:'key'});
     // Warga - delete all first, then insert
     const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
-    let delW = await supabase.from('warga').delete().gte('id',1);
+    let delW = await supaClient.from('warga').delete().gte('id',1);
     if(delW.error) console.log('Delete warga error:', delW.error.message);
     if(wargaRows.length > 0) {
       // Insert in batches of 20
       for(let i=0; i<wargaRows.length; i+=20) {
         let batch = wargaRows.slice(i, i+20);
-        let ins = await supabase.from('warga').insert(batch);
+        let ins = await supaClient.from('warga').insert(batch);
         if(ins.error) console.log('Insert warga error:', ins.error.message);
       }
     }
     // Transaksi
     const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
-    let delT = await supabase.from('transaksi').delete().gte('id',1);
+    let delT = await supaClient.from('transaksi').delete().gte('id',1);
     if(delT.error) console.log('Delete transaksi error:', delT.error.message);
     if(txRows.length > 0) {
-      let ins = await supabase.from('transaksi').insert(txRows);
+      let ins = await supaClient.from('transaksi').insert(txRows);
       if(ins.error) console.log('Insert transaksi error:', ins.error.message);
     }
     console.log('Supabase sync done: ' + wargaRows.length + ' warga, ' + txRows.length + ' transaksi');
@@ -649,10 +649,10 @@ async function syncToSupabase(data){
 }
 
 async function loadFromSupabase(){
-  if(!supabase) return null;
+  if(!supaClient) return null;
   try {
-    const {data: warga} = await supabase.from('warga').select('*').order('no');
-    const {data: tx} = await supabase.from('transaksi').select('*');
+    const {data: warga} = await supaClient.from('warga').select('*').order('no');
+    const {data: tx} = await supaClient.from('transaksi').select('*');
     if(!warga || warga.length === 0) return null;
     return {
       _version: DB_VERSION,
@@ -747,7 +747,7 @@ async function enterApp(){
   showTab('dashboard');
 
   // Sync Supabase in background (non-blocking)
-  if(supabase) syncSupabaseBG();
+  if(supaClient) syncSupabaseBG();
 }
 
 async function syncSupabaseBG(){
