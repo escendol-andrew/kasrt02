@@ -727,61 +727,51 @@ function doLogout(){
 async function enterApp(){
   document.getElementById('login-page').style.display='none';
   document.getElementById('app').style.display='block';
-  document.getElementById('user-badge').textContent='⏳ Syncing...';
 
-  // Show sync status
-  const syncStatus = document.createElement('div');
-  syncStatus.id = 'sync-status';
-  syncStatus.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#1B5E20;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;z-index:9999;';
-  syncStatus.textContent = '☁️ Menghubungkan ke server...';
-  document.body.appendChild(syncStatus);
-
-  // Load from Supabase first (server is source of truth)
-  try {
-    const supaDB = await loadFromSupabase();
-    if(supaDB && supaDB.warga && supaDB.warga.length > 0) {
-      DB = supaDB;
-      localStorage.setItem(DB_KEY, JSON.stringify(DB));
-      syncStatus.textContent = '☁️ ' + supaDB.warga.length + ' warga dimuat dari server';
-      setTimeout(() => syncStatus.remove(), 3000);
-    } else if(supabase && DB.warga && DB.warga.length > 0) {
-      syncStatus.textContent = '☁️ Mengupload ' + DB.warga.length + ' warga ke server...';
-      await syncToSupabase(DB);
-      const verify = await loadFromSupabase();
-      if(verify && verify.warga && verify.warga.length > 0) {
-        syncStatus.textContent = '✅ ' + verify.warga.length + ' warga berhasil diupload!';
-        syncStatus.style.background = '#28A745';
-      } else {
-        syncStatus.textContent = '⚠️ Upload gagal! Cek Console (F12)';
-        syncStatus.style.background = '#DC3545';
-      }
-      setTimeout(() => syncStatus.remove(), 5000);
-    } else if(!supabase) {
-      syncStatus.textContent = '⚠️ Supabase belum dikonfigurasi';
-      syncStatus.style.background = '#FFC107';
-      syncStatus.style.color = '#000';
-      setTimeout(() => syncStatus.remove(), 3000);
-    } else {
-      syncStatus.remove();
-    }
-  } catch(e) {
-    syncStatus.textContent = '❌ Error: ' + e.message;
-    syncStatus.style.background = '#DC3545';
-    console.log('Sync error:', e);
-    setTimeout(() => syncStatus.remove(), 8000);
-  }
-
+  // Show app immediately with local data (don't wait for Supabase)
   const isAdmin=currentUser.role==='admin';
   document.getElementById('user-badge').textContent=isAdmin?'🔐 Admin':'👤 '+DB.warga[currentUser.idx].nama;
   document.getElementById('info-role').textContent=isAdmin?'🔓 Mode Admin (bisa edit)':'👁️ Mode Warga (lihat saja)';
-
-  // Hide admin-only elements for warga
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
-
-  // Auto-sync iuran ke jurnal agar data keuangan selalu akurat
   syncIuranKeJurnal();
-
   showTab('dashboard');
+
+  // Sync Supabase in background (non-blocking)
+  if(supabase) syncSupabaseBG();
+}
+
+async function syncSupabaseBG(){
+  const syncStatus = document.createElement('div');
+  syncStatus.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#1B5E20;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;z-index:9999;';
+  syncStatus.textContent = '☁️ Syncing...';
+  document.body.appendChild(syncStatus);
+
+  try {
+    const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const supaDB = await Promise.race([loadFromSupabase(), timeout]);
+
+    if(supaDB && supaDB.warga && supaDB.warga.length > 0) {
+      DB = supaDB;
+      localStorage.setItem(DB_KEY, JSON.stringify(DB));
+      syncStatus.textContent = '☁️ ' + supaDB.warga.length + ' warga dari server';
+      syncStatus.style.background = '#28A745';
+      syncIuranKeJurnal();
+      renderDashboard(); renderTabel(); renderKeuangan(); renderLaporan();
+    } else if(DB.warga && DB.warga.length > 0) {
+      syncStatus.textContent = '☁️ Upload ke server...';
+      await syncToSupabase(DB);
+      syncStatus.textContent = '✅ Data diupload!';
+      syncStatus.style.background = '#28A745';
+    } else {
+      syncStatus.remove(); return;
+    }
+  } catch(e) {
+    syncStatus.textContent = '⚠️ Sync: ' + (e.message||'error');
+    syncStatus.style.background = '#FFC107';
+    syncStatus.style.color = '#000';
+    console.log('Supabase sync:', e);
+  }
+  setTimeout(() => syncStatus.remove(), 5000);
 }
 
 // ==================== HELPERS ====================
