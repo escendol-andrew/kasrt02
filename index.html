@@ -201,7 +201,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
       <button class="btn-login" onclick="doLoginWarga()">👤 Lihat Laporan Saya</button>
     </div>
 
-    <div id="supabase-config" style="margin-bottom:16px;padding:14px;background:#E3F2FD;border-radius:10px;font-size:.82em">
+    <div id="supabase-config" style="display:none">
       <strong>☁️ Sinkronisasi Cloud</strong>
       <p style="color:#666;margin:6px 0;font-size:.9em">Supaya semua warga lihat data sama</p>
       <div class="form-group" style="margin-top:8px">
@@ -594,8 +594,8 @@ const TRANSAKSI_DEFAULT = [];
 
 // ==================== SUPABASE (direct fetch) ====================
 const _supaCfg = JSON.parse(localStorage.getItem('rt_supabase_cfg') || '{}');
-const SUPABASE_URL = _supaCfg.url || '';
-const SUPABASE_KEY = _supaCfg.key || '';
+const SUPABASE_URL = _supaCfg.url || 'https://eokruhucldlysmgfaqep.supabase.co';
+const SUPABASE_KEY = _supaCfg.key || 'sb_publishable_t1I5nMkvaCDrmvVSveu_zw_MeNM1hEP';
 
 async function supaFetch(path, opts = {}) {
   if(!SUPABASE_URL || !SUPABASE_KEY) return { data: null, error: { message: 'Not configured' } };
