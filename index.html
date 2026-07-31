@@ -729,29 +729,46 @@ async function enterApp(){
   document.getElementById('app').style.display='block';
   document.getElementById('user-badge').textContent='⏳ Syncing...';
 
+  // Show sync status
+  const syncStatus = document.createElement('div');
+  syncStatus.id = 'sync-status';
+  syncStatus.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#1B5E20;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;z-index:9999;';
+  syncStatus.textContent = '☁️ Menghubungkan ke server...';
+  document.body.appendChild(syncStatus);
+
   // Load from Supabase first (server is source of truth)
-  const supaDB = await loadFromSupabase();
-  if(supaDB && supaDB.warga && supaDB.warga.length > 0) {
-    DB = supaDB;
-    localStorage.setItem(DB_KEY, JSON.stringify(DB));
-    toast('☁️ Data dari server dimuat!');
-  } else if(supabase && DB.warga && DB.warga.length > 0) {
-    // Supabase kosong → push data lokal ke server
-    toast('☁️ Mengupload data ke server...');
-    try {
+  try {
+    const supaDB = await loadFromSupabase();
+    if(supaDB && supaDB.warga && supaDB.warga.length > 0) {
+      DB = supaDB;
+      localStorage.setItem(DB_KEY, JSON.stringify(DB));
+      syncStatus.textContent = '☁️ ' + supaDB.warga.length + ' warga dimuat dari server';
+      setTimeout(() => syncStatus.remove(), 3000);
+    } else if(supabase && DB.warga && DB.warga.length > 0) {
+      syncStatus.textContent = '☁️ Mengupload ' + DB.warga.length + ' warga ke server...';
       await syncToSupabase(DB);
-      // Verify upload
       const verify = await loadFromSupabase();
       if(verify && verify.warga && verify.warga.length > 0) {
-        toast('✅ ' + verify.warga.length + ' warga berhasil diupload!');
+        syncStatus.textContent = '✅ ' + verify.warga.length + ' warga berhasil diupload!';
+        syncStatus.style.background = '#28A745';
       } else {
-        toast('⚠️ Upload gagal. Cek console (F12) untuk detail.');
+        syncStatus.textContent = '⚠️ Upload gagal! Cek Console (F12)';
+        syncStatus.style.background = '#DC3545';
       }
-    } catch(e) {
-      toast('❌ Error: ' + e.message);
+      setTimeout(() => syncStatus.remove(), 5000);
+    } else if(!supabase) {
+      syncStatus.textContent = '⚠️ Supabase belum dikonfigurasi';
+      syncStatus.style.background = '#FFC107';
+      syncStatus.style.color = '#000';
+      setTimeout(() => syncStatus.remove(), 3000);
+    } else {
+      syncStatus.remove();
     }
-  } else if(!supabase) {
-    toast('⚠️ Supabase belum dikonfigurasi.');
+  } catch(e) {
+    syncStatus.textContent = '❌ Error: ' + e.message;
+    syncStatus.style.background = '#DC3545';
+    console.log('Sync error:', e);
+    setTimeout(() => syncStatus.remove(), 8000);
   }
 
   const isAdmin=currentUser.role==='admin';
