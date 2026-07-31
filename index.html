@@ -718,6 +718,11 @@ async function enterApp(){
     DB = supaDB;
     localStorage.setItem(DB_KEY, JSON.stringify(DB));
     toast('☁️ Data dari server dimuat!');
+  } else if(supabase && DB.warga && DB.warga.length > 0) {
+    // Supabase kosong → push data lokal ke server
+    toast('☁️ Mengupload data ke server...');
+    await syncToSupabase(DB);
+    toast('✅ Data berhasil diupload ke cloud!');
   }
 
   const isAdmin=currentUser.role==='admin';
