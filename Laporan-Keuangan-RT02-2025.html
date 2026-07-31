@@ -648,9 +648,6 @@ function enterApp(){
   // Hide admin-only elements for warga
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
 
-  // Auto-sync iuran ke jurnal agar data keuangan selalu akurat
-  syncIuranKeJurnal();
-
   showTab('dashboard');
 }
 
