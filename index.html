@@ -701,12 +701,22 @@ function saveSupabaseCfg(){
   setTimeout(() => location.reload(), 800);
 }
 
-// Hide supabase config if already set
+// Show supabase config status
 (function(){
   const cfg = localStorage.getItem('rt_supabase_cfg');
   if(cfg) {
+    const c = JSON.parse(cfg);
     const el = document.getElementById('supabase-config');
-    if(el) el.style.display = 'none';
+    if(el) {
+      el.querySelector('input#cfg-url').value = c.url || '';
+      el.querySelector('input#cfg-key').value = c.key || '';
+      // Show warning if using secret key
+      if(c.key && c.key.startsWith('sb_secret')) {
+        el.style.background = '#FFEBEE';
+        el.querySelector('p').textContent = '⚠️ Ganti ke Publishable Key!';
+        el.querySelector('p').style.color = '#DC3545';
+      }
+    }
   }
 })();
 
