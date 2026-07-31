@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supabase Test</title>
+<style>
+body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:0 auto}
+input,textarea{width:100%;padding:10px;margin:5px 0 15px;border:1px solid #ccc;border-radius:8px;font-size:14px}
+button{padding:12px 20px;background:#1B5E20;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;margin:5px}
+button:hover{background:#2E7D32}
+#log{background:#f5f5f5;padding:15px;border-radius:8px;font-size:12px;white-space:pre-wrap;max-height:400px;overflow-y:auto;margin-top:15px}
+.ok{color:green} .err{color:red} .info{color:blue}
+</style>
+</head>
+<body>
+<h2>🔧 Supabase Connection Test</h2>
+<div>
+  <label>Project URL:</label>
+  <input type="text" id="url" value="https://eokruhucldlysmgfaqep.supabase.co">
+</div>
+<div>
+  <label>API Key:</label>
+  <input type="text" id="key" placeholder="Paste API key here">
+</div>
+<button onclick="testConnection()">🔌 Test Connection</button>
+<button onclick="testInsert()">📝 Test Insert</button>
+<button onclick="testRead()">📖 Test Read</button>
+<div id="log"></div>
+
+<script>
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const span = document.createElement('span');
+  span.className = cls || '';
+  span.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg + '\n';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function testConnection() {
+  const url = document.getElementById('url').value.trim();
+  const key = document.getElementById('key').value.trim();
+  if(!url || !key) { log('⚠️ Isi URL dan Key dulu!', 'err'); return; }
+  
+  log('🔌 Testing connection to: ' + url, 'info');
+  try {
+    const res = await fetch(url + '/rest/v1/', {
+      headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+    });
+    const data = await res.json();
+    if(res.ok) {
+      log('✅ Connection OK! Tables: ' + Object.keys(data.paths || {}).length, 'ok');
+    } else {
+      log('❌ Error: ' + JSON.stringify(data), 'err');
+    }
+  } catch(e) {
+    log('❌ Network error: ' + e.message, 'err');
+  }
+}
+
+async function testInsert() {
+  const url = document.getElementById('url').value.trim();
+  const key = document.getElementById('key').value.trim();
+  
+  log('📝 Testing insert into warga...', 'info');
+  try {
+    const res = await fetch(url + '/rest/v1/warga', {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify([{no:999,nama:'Test iPad',blok:'Z9/99',bayar:{},kosong:false}])
+    });
+    const data = await res.json();
+    if(res.ok) {
+      log('✅ Insert OK! ID: ' + data[0].id, 'ok');
+      // Now delete it
+      await fetch(url + '/rest/v1/warga?no=eq.999', {
+        method: 'DELETE',
+        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+      });
+      log('🧹 Test data cleaned up', 'info');
+    } else {
+      log('❌ Insert error: ' + JSON.stringify(data), 'err');
+    }
+  } catch(e) {
+    log('❌ Error: ' + e.message, 'err');
+  }
+}
+
+async function testRead() {
+  const url = document.getElementById('url').value.trim();
+  const key = document.getElementById('key').value.trim();
+  
+  log('📖 Reading warga table...', 'info');
+  try {
+    const res = await fetch(url + '/rest/v1/warga?select=no,nama,blok&limit=5', {
+      headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+    });
+    const data = await res.json();
+    if(res.ok) {
+      log('✅ Read OK! Rows: ' + data.length, 'ok');
+      data.forEach(w => log('  → ' + w.no + '. ' + w.nama + ' (' + w.blok + ')'));
+    } else {
+      log('❌ Read error: ' + JSON.stringify(data), 'err');
+    }
+  } catch(e) {
+    log('❌ Error: ' + e.message, 'err');
+  }
+}
+</script>
+</body>
+</html>
