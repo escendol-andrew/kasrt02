@@ -1170,9 +1170,15 @@ function renderKeuangan(){
 function renderTabelKeuangan(jenis,elementId){
   const txList=DB.transaksi.filter(t=>t.jenis===jenis);
   const kategoriMap={};
-  // Hanya dari transaksi (sudah termasuk iuran yang di-sync)
+  // Group by kategori - iuran entries grouped under "Iuran Warga"
   txList.forEach(t=>{
-    const key=t.keterangan||'Lainnya';
+    // Determine category key
+    let key;
+    if(t.ref==='iuran'){
+      key='Iuran Warga';
+    } else {
+      key=t.keterangan||'Lainnya';
+    }
     if(!kategoriMap[key])kategoriMap[key]={};
     const m=new Date(t.tanggal).getMonth()+1;
     kategoriMap[key][m]=(kategoriMap[key][m]||0)+t.jumlah;
