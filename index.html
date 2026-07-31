@@ -1327,24 +1327,28 @@ function getLaporanHTML(periode, bulanStart) {
 
 function downloadLaporanPDF(periode) {
   let bulanStart = 1;
+  let labelPeriode = '';
   if (periode === 'bulanan') {
     bulanStart = parseInt(document.getElementById('laporan-bulan-start').value);
+    labelPeriode = BLN_FULL[bulanStart-1] + ' ' + TAHUN;
   } else if (periode === 'semester') {
     bulanStart = 1;
+    labelPeriode = 'Semester 1 ' + TAHUN;
   } else {
     bulanStart = 1;
+    labelPeriode = 'Tahun ' + TAHUN;
   }
   
   const laporanHTML = getLaporanHTML(periode, bulanStart);
   
-  // Create temporary element
-  const container = document.createElement('div');
-  container.innerHTML = `
-    <div style="font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto">
+  // Create preview content
+  const previewContent = `
+    <div style="font-family:Arial,sans-serif;padding:20px;max-width:100%;margin:0 auto;background:#fff">
       <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1B5E20;padding-bottom:15px">
         <h1 style="color:#1B5E20;margin:0;font-size:20px">📊 LAPORAN KEUANGAN</h1>
         <h2 style="color:#1B5E20;margin:5px 0;font-size:16px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
         <p style="color:#666;margin:5px 0;font-size:12px">Ciputat Timur, Tangerang Selatan</p>
+        <p style="color:#1B5E20;margin:10px 0 0;font-size:14px;font-weight:700">${labelPeriode}</p>
       </div>
       ${laporanHTML}
       <div style="margin-top:40px;display:flex;justify-content:space-between">
@@ -1363,7 +1367,57 @@ function downloadLaporanPDF(periode) {
     </div>
   `;
   
-  // Generate filename
+  // Show preview in modal
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay show';
+  modal.id = 'pdf-preview-modal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:900px;max-height:90vh;overflow-y:auto">
+      <div class="modal-header">
+        <h3>📄 Preview Laporan ${labelPeriode}</h3>
+        <button class="modal-close" onclick="document.getElementById('pdf-preview-modal').remove()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:0">
+        <div id="pdf-preview-content" style="max-height:60vh;overflow-y:auto;border:1px solid #eee;margin:10px">${previewContent}</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="document.getElementById('pdf-preview-modal').remove()">❌ Tutup</button>
+        <button class="btn btn-primary" onclick="doDownloadPDF('${periode}',${bulanStart},'${labelPeriode}')">📥 Download PDF</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function doDownloadPDF(periode, bulanStart, labelPeriode) {
+  const laporanHTML = getLaporanHTML(periode, bulanStart);
+  
+  const container = document.createElement('div');
+  container.innerHTML = `
+    <div style="font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto">
+      <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1B5E20;padding-bottom:15px">
+        <h1 style="color:#1B5E20;margin:0;font-size:20px">📊 LAPORAN KEUANGAN</h1>
+        <h2 style="color:#1B5E20;margin:5px 0;font-size:16px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
+        <p style="color:#666;margin:5px 0;font-size:12px">Ciputat Timur, Tangerang Selatan</p>
+        <p style="color:#1B5E20;margin:10px 0 0;font-size:14px;font-weight:700">${labelPeriode}</p>
+      </div>
+      ${laporanHTML}
+      <div style="margin-top:40px;display:flex;justify-content:space-between">
+        <div style="text-align:center">
+          <p style="margin:0;font-size:11px">Mengetahui,</p>
+          <p style="margin:0;font-weight:700;font-size:11px">Ketua RT 02</p>
+          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
+        </div>
+        <div style="text-align:center">
+          <p style="margin:0;font-size:11px">Tangerang Selatan, ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
+          <p style="margin:0;font-weight:700;font-size:11px">Bendahara RT 02</p>
+          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
+          <p style="margin:5px 0 0;font-weight:700;font-size:11px">Andriyana</p>
+        </div>
+      </div>
+    </div>
+  `;
+  
   let filename = 'Laporan_Keuangan_RT02';
   if (periode === 'bulanan') {
     filename += '_' + BLN_FULL[bulanStart-1] + '_' + TAHUN;
@@ -1374,7 +1428,6 @@ function downloadLaporanPDF(periode) {
   }
   filename += '.pdf';
   
-  // Generate PDF
   const opt = {
     margin: [10, 10, 10, 10],
     filename: filename,
@@ -1386,6 +1439,7 @@ function downloadLaporanPDF(periode) {
   toast('⏳ Sedang membuat PDF...');
   html2pdf().set(opt).from(container).save().then(() => {
     toast('✅ PDF berhasil di-download!');
+    document.getElementById('pdf-preview-modal')?.remove();
   }).catch(err => {
     toast('❌ Gagal membuat PDF: ' + err.message);
   });
