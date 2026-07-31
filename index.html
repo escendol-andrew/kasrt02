@@ -664,9 +664,6 @@ function showTab(t){
 // ==================== DASHBOARD ====================
 let chartPie, chartBar, chartCashflow, chartTop, chartWargaPie, chartWargaBar;
 
-// Pie percent plugin - only draws on doughnut
-const piePercentPlugin={id:'piePercent',afterDraw(c){if(c.config.type!=='doughnut')return;const{ctx,data:d}=c;const m=c.getDatasetMeta(0);const t=d.datasets[0].data.reduce((a,b)=>a+b,0);if(!t)return;ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';m.data.forEach((a,i)=>{const v=d.datasets[0].data[i];const p=Math.round(v/t*100);if(p<5)return;const p2=a.tooltipPosition();ctx.fillText(p+'%',p2.x,p2.y)});ctx.restore()}};Chart.register(piePercentPlugin);
-
 function renderDashboard(){
   const isAdmin = currentUser && currentUser.role === 'admin';
 
@@ -704,10 +701,12 @@ function renderDashboardAdmin(){
   // PIE CHART
   const pieCtx = document.getElementById('chart-pie').getContext('2d');
   if(chartPie) chartPie.destroy();
+  const pieTotal = lunas + belumLunas + belumBayar + totalKosong;
+  const piePct = v => pieTotal ? Math.round(v/pieTotal*100) : 0;
   chartPie = new Chart(pieCtx, {
     type: 'doughnut',
     data: {
-      labels: ['Lunas (6 bulan)', 'Bayar Sebagian', 'Belum Bayar', 'Rumah Kosong'],
+      labels: ['Lunas (6 bulan) '+piePct(lunas)+'%', 'Bayar Sebagian '+piePct(belumLunas)+'%', 'Belum Bayar '+piePct(belumBayar)+'%', 'Rumah Kosong '+piePct(totalKosong)+'%'],
       datasets: [{
         data: [lunas, belumLunas, belumBayar, totalKosong],
         backgroundColor: ['#28A745', '#FFC107', '#DC3545', '#adb5bd'],
@@ -854,10 +853,12 @@ function renderDashboardWarga(){
   // PIE CHART - Status saya
   const pieCtx = document.getElementById('chart-warga-pie').getContext('2d');
   if(chartWargaPie) chartWargaPie.destroy();
+  const wargaPieTotal = totalBayar + totalBelum;
+  const wargaPct = v => wargaPieTotal ? Math.round(v/wargaPieTotal*100) : 0;
   chartWargaPie = new Chart(pieCtx, {
     type: 'doughnut',
     data: {
-      labels: ['Sudah Bayar', 'Belum Bayar'],
+      labels: ['Sudah Bayar '+wargaPct(totalBayar)+'%', 'Belum Bayar '+wargaPct(totalBelum)+'%'],
       datasets: [{
         data: [totalBayar, totalBelum],
         backgroundColor: ['#28A745', '#DC3545'],
