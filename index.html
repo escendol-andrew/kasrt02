@@ -269,7 +269,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
         </div>
         <div class="chart-grid">
           <div class="chart-card">
-            <h4>💵 Arus Kas per Bulan</h4>
+            <h4>📊 Posisi Saldo Kas per Bulan</h4>
             <div class="chart-container"><canvas id="chart-cashflow"></canvas></div>
           </div>
           <div class="chart-card">
@@ -774,36 +774,67 @@ function renderDashboardAdmin(){
     }
   });
 
-  // LINE CHART
+  // LINE CHART - Posisi Saldo Kas per Bulan
   const cashCtx = document.getElementById('chart-cashflow').getContext('2d');
   if(chartCashflow) chartCashflow.destroy();
   const saldoBulanan = [];
   let saldoRunning = 0;
   for(let m=1;m<=12;m++){
-    saldoRunning += pemasukanBulanan[m-1] - pengeluaranBulanan[m-1];
+    const masuk = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    saldoRunning += masuk - keluar;
     saldoBulanan.push(saldoRunning);
   }
+  // Hitung target kas (total iuran jika semua warga bayar 12 bulan)
+  const targetKas = DB.warga.filter(w=>!w.kosong).reduce((s,w)=>s+getIuran(w)*12, 0);
+  const targetLine = Array(12).fill(targetKas);
   chartCashflow = new Chart(cashCtx, {
     type: 'line',
     data: {
       labels: BLN,
-      datasets: [{
-        label: 'Saldo Kas',
-        data: saldoBulanan,
-        borderColor: '#17A2B8',
-        backgroundColor: 'rgba(23,162,184,.1)',
-        fill: true,
-        tension: .3,
-        pointRadius: 5,
-        pointBackgroundColor: '#17A2B8'
-      }]
+      datasets: [
+        {
+          label: 'Saldo Kas',
+          data: saldoBulanan,
+          borderColor: '#1B5E20',
+          backgroundColor: 'rgba(27,94,32,.1)',
+          fill: true,
+          tension: .3,
+          pointRadius: 6,
+          pointBackgroundColor: '#1B5E20',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          borderWidth: 3
+        },
+        {
+          label: 'Target Kas',
+          data: targetLine,
+          borderColor: '#FFD700',
+          borderDash: [8, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': Rp ' + ctx.raw.toLocaleString('id-ID');
+            }
+          }
+        }
+      },
       scales: {
-        y: { ticks: { callback: v => 'Rp ' + (v/1000000).toFixed(1) + 'jt' } },
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => 'Rp ' + (v/1000000).toFixed(1) + 'jt' }
+        },
         x: { grid: { display: false } }
       }
     }
