@@ -9,7 +9,7 @@
 <title>RT 02/RW 014 — Griya Satwika Telkom</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script>Chart.register(ChartDataLabels);</script>
+<script>/* datalabels registered per-chart, not globally */</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#1B5E20;--primary-light:#2E7D32;--primary-dark:#0D3B13;--accent:#FFD700;--bg:#F0F2F5;--card:#FFF;--text:#1a1a2e;--text-light:#6c757d;--danger:#DC3545;--success:#28A745;--warning:#FFC107;--info:#17A2B8;--check:#28A745;--cross:#DC3545;--yellow:#FFF9C4;--border:#dee2e6;--shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -717,7 +717,7 @@ function renderDashboardAdmin(){
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
+      plugins: [ChartDataLabels, {
         legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
@@ -727,16 +727,17 @@ function renderDashboardAdmin(){
               return ctx.label + ': ' + ctx.raw + ' warga (' + pct + '%)';
             }
           }
-        },
-        datalabels: {
-          color: '#fff',
-          font: { weight: 'bold', size: 14 },
-          formatter: function(value, ctx) {
-            const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
-            const pct = Math.round(value/total*100);
-            if (pct < 5) return '';
-            return pct + '%';
-          }
+        }
+      }],
+      // @ts-ignore
+      datalabels: {
+        color: '#fff',
+        font: { weight: 'bold', size: 14 },
+        formatter: function(value, ctx) {
+          const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+          const pct = Math.round(value/total*100);
+          if (pct < 5) return '';
+          return pct + '%';
         }
       }
     }
@@ -767,7 +768,7 @@ function renderDashboardAdmin(){
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } }, datalabels: { display: false } },
+      plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } },
       scales: {
         y: { beginAtZero: true, ticks: { callback: v => 'Rp ' + (v/1000000).toFixed(1) + 'jt' } },
         x: { grid: { display: false } }
@@ -829,7 +830,7 @@ function renderDashboardAdmin(){
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, datalabels: { display: false } },
+      plugins: { legend: { display: false } },
       scales: {
         x: { beginAtZero: true, max: 6, ticks: { stepSize: 1 } },
         y: { grid: { display: false }, ticks: { font: { size: 10 } } }
@@ -877,7 +878,7 @@ function renderDashboardWarga(){
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
+      plugins: [ChartDataLabels, {
         legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
@@ -886,16 +887,17 @@ function renderDashboardWarga(){
               return ctx.label + ': ' + ctx.raw + ' bulan (' + pct + '%)';
             }
           }
-        },
-        datalabels: {
-          color: '#fff',
-          font: { weight: 'bold', size: 14 },
-          formatter: function(value, ctx) {
-            const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
-            const pct = Math.round(value/total*100);
-            if (pct < 5) return '';
-            return pct + '%';
-          }
+        }
+      }],
+      // @ts-ignore
+      datalabels: {
+        color: '#fff',
+        font: { weight: 'bold', size: 14 },
+        formatter: function(value, ctx) {
+          const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+          const pct = Math.round(value/total*100);
+          if (pct < 5) return '';
+          return pct + '%';
         }
       }
     }
