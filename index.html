@@ -641,7 +641,7 @@ async function syncToSupabase(data){
     // Settings
     await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
     // Warga - delete all first, then insert
-    await supaFetch('/warga?id=gte.1', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+    await supaFetch('/warga?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
     const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
     if(wargaRows.length > 0) {
       for(let i=0; i<wargaRows.length; i+=20) {
@@ -651,7 +651,7 @@ async function syncToSupabase(data){
       }
     }
     // Transaksi
-    await supaFetch('/transaksi?id=gte.1', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+    await supaFetch('/transaksi?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
     const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
     if(txRows.length > 0) {
       let r = await supaFetch('/transaksi', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(txRows) });
