@@ -9,7 +9,6 @@
 <title>RT 02/RW 014 — Griya Satwika Telkom</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#1B5E20;--primary-light:#2E7D32;--primary-dark:#0D3B13;--accent:#FFD700;--bg:#F0F2F5;--card:#FFF;--text:#1a1a2e;--text-light:#6c757d;--danger:#DC3545;--success:#28A745;--warning:#FFC107;--info:#17A2B8;--check:#28A745;--cross:#DC3545;--yellow:#FFF9C4;--border:#dee2e6;--shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -593,11 +592,31 @@ const WARGA_DEFAULT = [
 ];
 const TRANSAKSI_DEFAULT = [];
 
-// ==================== SUPABASE ====================
+// ==================== SUPABASE (direct fetch) ====================
 const _supaCfg = JSON.parse(localStorage.getItem('rt_supabase_cfg') || '{}');
 const SUPABASE_URL = _supaCfg.url || '';
 const SUPABASE_KEY = _supaCfg.key || '';
-const supaClient = (SUPABASE_URL && SUPABASE_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+async function supaFetch(path, opts = {}) {
+  if(!SUPABASE_URL || !SUPABASE_KEY) return { data: null, error: { message: 'Not configured' } };
+  try {
+    const url = SUPABASE_URL + '/rest/v1' + path;
+    const headers = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      ...opts.headers
+    };
+    const res = await fetch(url, { ...opts, headers });
+    if(!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      return { data: null, error: err };
+    }
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    return { data, error: null };
+  } catch(e) { return { data: null, error: e }; }
+}
 
 // ==================== STORAGE ====================
 const DB_KEY = 'rt_griya_satwika_v5';
@@ -617,47 +636,41 @@ function saveDB(d){
 }
 
 async function syncToSupabase(data){
-  if(!supaClient) { console.log('Supabase not configured'); return; }
+  if(!SUPABASE_URL || !SUPABASE_KEY) return;
   try {
     // Settings
-    let r = await supaClient.from('settings').upsert({key:'tahun',value:TAHUN},{onConflict:'key'});
-    if(r.error) console.log('Settings error:', r.error.message);
-    await supaClient.from('settings').upsert({key:'iuran_normal',value:IURAN},{onConflict:'key'});
-    await supaClient.from('settings').upsert({key:'iuran_kosong',value:IURAN_KOSONG},{onConflict:'key'});
+    await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
     // Warga - delete all first, then insert
+    await supaFetch('/warga?id=gte.1', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
     const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
-    let delW = await supaClient.from('warga').delete().gte('id',1);
-    if(delW.error) console.log('Delete warga error:', delW.error.message);
     if(wargaRows.length > 0) {
-      // Insert in batches of 20
       for(let i=0; i<wargaRows.length; i+=20) {
         let batch = wargaRows.slice(i, i+20);
-        let ins = await supaClient.from('warga').insert(batch);
-        if(ins.error) console.log('Insert warga error:', ins.error.message);
+        let r = await supaFetch('/warga', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(batch) });
+        if(r.error) console.log('Insert warga error:', r.error.message);
       }
     }
     // Transaksi
+    await supaFetch('/transaksi?id=gte.1', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
     const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
-    let delT = await supaClient.from('transaksi').delete().gte('id',1);
-    if(delT.error) console.log('Delete transaksi error:', delT.error.message);
     if(txRows.length > 0) {
-      let ins = await supaClient.from('transaksi').insert(txRows);
-      if(ins.error) console.log('Insert transaksi error:', ins.error.message);
+      let r = await supaFetch('/transaksi', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(txRows) });
+      if(r.error) console.log('Insert transaksi error:', r.error.message);
     }
     console.log('Supabase sync done: ' + wargaRows.length + ' warga, ' + txRows.length + ' transaksi');
   } catch(e) { console.log('Supabase sync error:', e.message); }
 }
 
 async function loadFromSupabase(){
-  if(!supaClient) return null;
+  if(!SUPABASE_URL || !SUPABASE_KEY) return null;
   try {
-    const {data: warga} = await supaClient.from('warga').select('*').order('no');
-    const {data: tx} = await supaClient.from('transaksi').select('*');
-    if(!warga || warga.length === 0) return null;
+    const wr = await supaFetch('/warga?select=*&order=no.asc');
+    const tr = await supaFetch('/transaksi?select=*');
+    if(wr.error || !wr.data || wr.data.length === 0) return null;
     return {
       _version: DB_VERSION,
-      warga: warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false})),
-      transaksi: (tx||[]).map(t => ({id:t.uid,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}))
+      warga: wr.data.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false})),
+      transaksi: (tr.data||[]).map(t => ({id:t.uid,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}))
     };
   } catch(e) { console.log('Supabase load error:', e.message); return null; }
 }
@@ -747,7 +760,7 @@ async function enterApp(){
   showTab('dashboard');
 
   // Sync Supabase in background (non-blocking)
-  if(supaClient) syncSupabaseBG();
+  if(SUPABASE_URL && SUPABASE_KEY) syncSupabaseBG();
 }
 
 async function syncSupabaseBG(){
