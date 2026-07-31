@@ -1416,13 +1416,15 @@ function renderLaporan(){
     labelPeriode = 'Tahun ' + TAHUN;
   }
 
-  // Calculate totals
+  // Calculate totals - use journal as single source of truth
   let totalIuran = 0, totalMasukLain = 0, totalKeluar = 0;
   const iuranPerBulan = [], masukPerBulan = [], keluarPerBulan = [], saldoPerBulan = [];
 
   months.forEach(m => {
-    const iuran = DB.warga.filter((w,i) => isPaid(i,m)).reduce((s,w)=>s+getIuran(w,m),0);
-    const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+    // Iuran from journal (ref='iuran')
+    const iuran = DB.transaksi.filter(t => t.jenis==='masuk' && t.ref==='iuran' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+    // Other income (not iuran)
+    const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && t.ref!=='iuran' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
     const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
     totalIuran += iuran;
     totalMasukLain += masuk;
@@ -1433,7 +1435,7 @@ function renderLaporan(){
     saldoPerBulan.push(iuran + masuk - keluar);
   });
 
-  const totalPemasukan = totalMasukLain;
+  const totalPemasukan = totalIuran + totalMasukLain;
   const saldoKas = totalPemasukan - totalKeluar;
   const totalWarga = DB.warga.length;
   const totalKosong = DB.warga.filter(w => w.kosong).length;
