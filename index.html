@@ -1348,54 +1348,57 @@ function downloadPDF() {
   const laporanHTML = document.getElementById('laporan-content').innerHTML;
   const periodeEl = document.getElementById('laporan-periode');
   const label = periodeEl.options[periodeEl.selectedIndex].text;
-  const filename = 'Laporan_Keuangan_RT02_' + label.replace(/\s+/g,'_') + '.pdf';
   
-  const container = document.createElement('div');
-  container.innerHTML = `
-    <div style="font-family:Arial,sans-serif;padding:20px;max-width:1100px;margin:0 auto">
-      <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid #1B5E20;padding-bottom:15px">
-        <h1 style="color:#1B5E20;margin:0;font-size:24px">📊 LAPORAN KEUANGAN</h1>
-        <h2 style="color:#1B5E20;margin:8px 0;font-size:18px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
-        <p style="color:#666;margin:5px 0;font-size:13px">Ciputat Timur, Tangerang Selatan</p>
-        <p style="color:#1B5E20;margin:10px 0 0;font-size:18px;font-weight:700">${label}</p>
-      </div>
-      ${laporanHTML}
-      <div style="margin-top:50px;display:flex;justify-content:space-between;padding:0 20px">
-        <div style="text-align:center">
-          <p style="margin:0;font-size:12px">Mengetahui,</p>
-          <p style="margin:0;font-weight:700;font-size:12px">Ketua RT 02</p>
-          <div style="margin-top:60px;border-top:1px solid #333;width:150px;display:inline-block"></div>
-        </div>
-        <div style="text-align:center">
-          <p style="margin:0;font-size:12px">Tgl, ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
-          <p style="margin:0;font-weight:700;font-size:12px">Bendahara RT 02</p>
-          <div style="margin-top:60px;border-top:1px solid #333;width:150px;display:inline-block"></div>
-          <p style="margin:8px 0 0;font-weight:700;font-size:12px">Andriyana</p>
-        </div>
-      </div>
+  const printWin = window.open('', '_blank');
+  printWin.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Laporan Keuangan RT02 - ${label}</title>
+<style>
+  @page { size: landscape; margin: 10mm; }
+  @media print { body { margin: 0; } }
+  body { font-family: Arial, sans-serif; padding: 15px; color: #1a1a2e; font-size: 11px; }
+  .header { text-align: center; border-bottom: 3px solid #1B5E20; padding-bottom: 12px; margin-bottom: 15px; }
+  .header h1 { color: #1B5E20; margin: 0; font-size: 22px; }
+  .header h2 { color: #1B5E20; margin: 6px 0; font-size: 16px; }
+  .header p { color: #666; font-size: 12px; margin: 3px 0; }
+  .header .periode { color: #1B5E20; font-size: 16px; font-weight: 700; margin-top: 8px; }
+  h3 { color: #1B5E20; font-size: 13px; margin: 18px 0 8px; border-bottom: 2px solid #1B5E20; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 18px; font-size: 11px; }
+  th { background: #1B5E20; color: #fff; padding: 8px 6px; text-align: center; font-size: 10px; }
+  td { padding: 7px 6px; border-bottom: 1px solid #eee; text-align: center; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  .signature { margin-top: 40px; display: flex; justify-content: space-between; padding: 0 40px; }
+  .sig-box { text-align: center; }
+  .sig-box .line { margin-top: 50px; border-top: 1px solid #333; width: 150px; display: inline-block; }
+  .footer { text-align: center; margin-top: 25px; padding-top: 8px; border-top: 2px solid #1B5E20; color: #666; font-size: 9px; }
+</style>
+</head><body>
+  <div class="header">
+    <h1>📊 LAPORAN KEUANGAN</h1>
+    <h2>RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
+    <p>Ciputat Timur, Tangerang Selatan</p>
+    <p class="periode">${label}</p>
+  </div>
+  ${laporanHTML}
+  <div class="signature">
+    <div class="sig-box">
+      <p style="margin:0;font-size:11px">Mengetahui,</p>
+      <p style="margin:0;font-weight:700;font-size:11px">Ketua RT 02</p>
+      <div class="line"></div>
     </div>
-  `;
-  
-  toast('⏳ Membuat PDF...');
-  
-  if (typeof html2pdf === 'undefined') {
-    toast('❌ Library PDF belum loaded. Refresh halaman dulu.');
-    return;
-  }
-  
-  html2pdf().set({
-    margin: [10, 10, 10, 10],
-    filename: filename,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-  }).from(container).save().then(function() {
-    toast('✅ PDF berhasil disimpan!');
-    var m = document.getElementById('pdfPreviewModal');
-    if (m) m.remove();
-  }).catch(function(err) {
-    toast('❌ Gagal: ' + err.message);
-  });
+    <div class="sig-box">
+      <p style="margin:0;font-size:11px">${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
+      <p style="margin:0;font-weight:700;font-size:11px">Bendahara RT 02</p>
+      <div class="line"></div>
+      <p style="margin:6px 0 0;font-weight:700;font-size:11px">Andriyana</p>
+    </div>
+  </div>
+  <div class="footer"><p>Bendahara: Andriyana &bull; Sistem Pelaporan Keuangan RT 2026</p></div>
+</body></html>`);
+  printWin.document.close();
+  printWin.onload = function() {
+    setTimeout(function() { printWin.print(); }, 300);
+  };
 }
 
 function renderLaporan(){
