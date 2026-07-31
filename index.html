@@ -378,7 +378,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
         <div id="tabel-pengeluaran"></div>
       </div>
       <div class="card">
-        <h3>📝 Jurnal Umum</h3>
+        <h3>📝 Jurnal Umum <button class="btn btn-outline btn-sm admin-only" onclick="syncIuranKeJurnal()" style="margin-left:10px;font-size:.75em">🔄 Sinkron Iuran</button></h3>
         <div class="filter-bar">
           <select id="filter-bulan-keuangan" onchange="renderKeuangan()">
             <option value="all">Semua Bulan</option>
@@ -1052,11 +1052,18 @@ function saveEditBayar(){
   // Update status kosong
   w.kosong=document.getElementById('edit-bayar-kosong').checked;
   
-  // Update pembayaran
+  // Hapus transaksi iuran lama untuk warga ini
+  DB.transaksi=DB.transaksi.filter(t=>!(t.ref==='iuran'&&t.wargaIdx===idx));
+  
+  // Update pembayaran & sinkron ke jurnal
   for(let m=1;m<=12;m++){
     const cb=document.getElementById('eb-'+m);
     if(cb.checked){
       w.bayar[m]=1;
+      // Tambah ke jurnal umum
+      const iuran=getIuran(w,m);
+      const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
+      DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:m});
     } else {
       delete w.bayar[m];
     }
@@ -1067,7 +1074,35 @@ function saveEditBayar(){
   renderTabel();
   renderDashboard();
   renderLaporan();
+  renderKeuangan();
   toast(`✅ Data ${w.nama} diperbarui`);
+}
+
+function bayarIuran(){
+  const idx=parseInt(document.getElementById('bayar-idx').value);
+  const w=DB.warga[idx];
+  if(!w)return;
+  const select=document.getElementById('bayar-bulan');
+  const selectedMonths=Array.from(select.selectedOptions).map(o=>parseInt(o.value));
+  if(!selectedMonths.length){toast('⚠️ Pilih bulan terlebih dahulu!');return}
+  
+  selectedMonths.forEach(m=>{
+    if(w.bayar[m]!==1){
+      w.bayar[m]=1;
+      // Tambah ke jurnal umum
+      const iuran=getIuran(w,m);
+      const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
+      DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:m});
+    }
+  });
+  
+  saveDB(DB);
+  closeModal('modal-bayar');
+  renderTabel();
+  renderDashboard();
+  renderLaporan();
+  renderKeuangan();
+  toast(`✅ Pembayaran ${w.nama} berhasil dicatat`);
 }
 
 function toggleBayar(idx,bulan){
@@ -1078,18 +1113,45 @@ function toggleBayar(idx,bulan){
   if(w.bayar[bulan]===1){
     if(!confirm(`Hapus pembayaran ${BLN_FULL[bulan-1]} ${TAHUN} untuk ${w.nama}?`))return;
     delete w.bayar[bulan];
+    // Hapus dari jurnal umum
+    DB.transaksi=DB.transaksi.filter(t=>!(t.ref==='iuran'&&t.wargaIdx===idx&&t.bulan===bulan));
     toast(`❌ ${BLN_FULL[bulan-1]} ${w.nama} dibatalkan`);
   } else {
     w.bayar[bulan]=1;
+    // Tambah ke jurnal umum
+    const iuran=getIuran(w,bulan);
+    const tgl=new Date(TAHUN,bulan-1,1).toISOString().slice(0,10);
+    DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[bulan-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:bulan});
     toast(`✅ ${BLN_FULL[bulan-1]} ${w.nama} terbayar`);
   }
   saveDB(DB);
   renderTabel();
   renderDashboard();
   renderLaporan();
+  renderKeuangan();
 }
 
 // ==================== KEUANGAN ====================
+function syncIuranKeJurnal(){
+  // Hapus semua transaksi iuran lama
+  DB.transaksi=DB.transaksi.filter(t=>t.ref!=='iuran');
+  // Buat ulang dari data pembayaran
+  DB.warga.forEach(function(w,idx){
+    for(let m=1;m<=12;m++){
+      if(isPaid(idx,m)){
+        const iuran=getIuran(w,m);
+        const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
+        DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran ${w.nama} - ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:iuran,tanggal:tgl,ref:'iuran',wargaIdx:idx,bulan:m});
+      }
+    }
+  });
+  saveDB(DB);
+  renderKeuangan();
+  renderDashboard();
+  renderLaporan();
+  toast('✅ Semua data iuran berhasil disinkronkan ke jurnal umum');
+}
+
 function renderKeuangan(){
   const totalMasuk=DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
   const totalKeluar=DB.transaksi.filter(t=>t.jenis==='keluar').reduce((s,t)=>s+t.jumlah,0);
