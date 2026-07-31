@@ -416,9 +416,9 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
           </select>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-          <button class="btn btn-primary btn-sm" onclick="downloadLaporanPDF('bulanan')">📥 PDF Bulanan</button>
-          <button class="btn btn-primary btn-sm" onclick="downloadLaporanPDF('semester')">📥 PDF Semester</button>
-          <button class="btn btn-primary btn-sm" onclick="downloadLaporanPDF('tahunan')">📥 PDF Tahunan</button>
+          <button class="btn btn-primary btn-sm" onclick="showPreviewPDF('bulanan')">📥 PDF Bulanan</button>
+          <button class="btn btn-primary btn-sm" onclick="showPreviewPDF('semester')">📥 PDF Semester</button>
+          <button class="btn btn-primary btn-sm" onclick="showPreviewPDF('tahunan')">📥 PDF Tahunan</button>
           <button class="btn btn-outline btn-sm" onclick="cetakLaporan('bulanan')">🖨️ Cetak Bulanan</button>
           <button class="btn btn-outline btn-sm" onclick="cetakLaporan('semester')">🖨️ Cetak Semester</button>
           <button class="btn btn-outline btn-sm" onclick="cetakLaporan('tahunan')">🖨️ Cetak Tahunan</button>
@@ -1304,203 +1304,140 @@ function hapusTransaksi(id){
 }
 
 // ==================== LAPORAN ====================
-function getLaporanHTML(periode, bulanStart) {
-  // Generate laporan HTML for given period
-  const savedPeriode = document.getElementById('laporan-periode').value;
-  const savedBulan = document.getElementById('laporan-bulan-start').value;
+function showPreviewPDF(periode) {
+  // Get current filter values
+  const curPeriode = document.getElementById('laporan-periode').value;
+  const curBulan = document.getElementById('laporan-bulan-start').value;
   
-  // Set values temporarily
+  // Set to requested period
   document.getElementById('laporan-periode').value = periode;
-  document.getElementById('laporan-bulan-start').value = bulanStart;
-  
-  // Generate report
-  renderLaporan();
-  const html = document.getElementById('laporan-content').innerHTML;
-  
-  // Restore original values
-  document.getElementById('laporan-periode').value = savedPeriode;
-  document.getElementById('laporan-bulan-start').value = savedBulan;
-  renderLaporan();
-  
-  return html;
-}
-
-function downloadLaporanPDF(periode) {
-  let bulanStart = 1;
-  let labelPeriode = '';
   if (periode === 'bulanan') {
-    bulanStart = parseInt(document.getElementById('laporan-bulan-start').value);
-    labelPeriode = BLN_FULL[bulanStart-1] + ' ' + TAHUN;
+    // Keep current month selection
   } else if (periode === 'semester') {
-    bulanStart = 1;
-    labelPeriode = 'Semester 1 ' + TAHUN;
+    document.getElementById('laporan-bulan-start').value = '1';
   } else {
-    bulanStart = 1;
-    labelPeriode = 'Tahun ' + TAHUN;
+    document.getElementById('laporan-bulan-start').value = '1';
   }
   
-  const laporanHTML = getLaporanHTML(periode, bulanStart);
+  // Generate laporan
+  renderLaporan();
+  const laporanHTML = document.getElementById('laporan-content').innerHTML;
   
-  // Create preview content
-  const previewContent = `
-    <div style="font-family:Arial,sans-serif;padding:20px;max-width:100%;margin:0 auto;background:#fff">
-      <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1B5E20;padding-bottom:15px">
-        <h1 style="color:#1B5E20;margin:0;font-size:20px">📊 LAPORAN KEUANGAN</h1>
-        <h2 style="color:#1B5E20;margin:5px 0;font-size:16px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
-        <p style="color:#666;margin:5px 0;font-size:12px">Ciputat Timur, Tangerang Selatan</p>
-        <p style="color:#1B5E20;margin:10px 0 0;font-size:14px;font-weight:700">${labelPeriode}</p>
-      </div>
-      ${laporanHTML}
-      <div style="margin-top:40px;display:flex;justify-content:space-between">
-        <div style="text-align:center">
-          <p style="margin:0;font-size:11px">Mengetahui,</p>
-          <p style="margin:0;font-weight:700;font-size:11px">Ketua RT 02</p>
-          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
-        </div>
-        <div style="text-align:center">
-          <p style="margin:0;font-size:11px">Tangerang Selatan, ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
-          <p style="margin:0;font-weight:700;font-size:11px">Bendahara RT 02</p>
-          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
-          <p style="margin:5px 0 0;font-weight:700;font-size:11px">Andriyana</p>
-        </div>
-      </div>
-    </div>
-  `;
+  // Restore original filter
+  document.getElementById('laporan-periode').value = curPeriode;
+  document.getElementById('laporan-bulan-start').value = curBulan;
+  renderLaporan();
   
-  // Show preview in modal
-  const modal = document.createElement('div');
+  // Label
+  let label = '';
+  if (periode === 'bulanan') {
+    label = BLN_FULL[parseInt(curBulan)-1] + ' ' + TAHUN;
+  } else if (periode === 'semester') {
+    label = 'Semester ' + TAHUN;
+  } else {
+    label = 'Tahun ' + TAHUN;
+  }
+  
+  // Show modal preview
+  let modal = document.getElementById('pdfPreviewModal');
+  if (modal) modal.remove();
+  
+  modal = document.createElement('div');
+  modal.id = 'pdfPreviewModal';
   modal.className = 'modal-overlay show';
-  modal.id = 'pdf-preview-modal';
   modal.innerHTML = `
-    <div class="modal" style="max-width:900px;max-height:90vh;overflow-y:auto">
+    <div class="modal" style="max-width:900px;max-height:90vh">
       <div class="modal-header">
-        <h3>📄 Preview Laporan ${labelPeriode}</h3>
-        <button class="modal-close" onclick="document.getElementById('pdf-preview-modal').remove()">✕</button>
+        <h3>📄 Preview: Laporan ${label}</h3>
+        <button class="modal-close" onclick="document.getElementById('pdfPreviewModal').remove()">✕</button>
       </div>
-      <div class="modal-body" style="padding:0">
-        <div id="pdf-preview-content" style="max-height:60vh;overflow-y:auto;border:1px solid #eee;margin:10px">${previewContent}</div>
+      <div class="modal-body" style="padding:0;overflow:hidden">
+        <div id="pdfPreviewContent" style="max-height:55vh;overflow-y:auto;padding:15px;background:#fff">${laporanHTML}</div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="document.getElementById('pdf-preview-modal').remove()">❌ Tutup</button>
-        <button class="btn btn-primary" onclick="doDownloadPDF('${periode}',${bulanStart},'${labelPeriode}')">📥 Download PDF</button>
+        <button class="btn btn-outline" onclick="document.getElementById('pdfPreviewModal').remove()">❌ Tutup</button>
+        <button class="btn btn-primary" onclick="downloadPDF('${periode}')">📥 Download PDF</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
 }
 
-function doDownloadPDF(periode, bulanStart, labelPeriode) {
-  const laporanHTML = getLaporanHTML(periode, bulanStart);
+function downloadPDF(periode) {
+  const curPeriode = document.getElementById('laporan-periode').value;
+  const curBulan = document.getElementById('laporan-bulan-start').value;
+  
+  document.getElementById('laporan-periode').value = periode;
+  if (periode === 'semester') document.getElementById('laporan-bulan-start').value = '1';
+  if (periode === 'tahunan') document.getElementById('laporan-bulan-start').value = '1';
+  
+  renderLaporan();
+  const laporanHTML = document.getElementById('laporan-content').innerHTML;
+  
+  document.getElementById('laporan-periode').value = curPeriode;
+  document.getElementById('laporan-bulan-start').value = curBulan;
+  renderLaporan();
+  
+  let label = '';
+  let filename = 'Laporan_Keuangan_RT02';
+  if (periode === 'bulanan') {
+    label = BLN_FULL[parseInt(curBulan)-1] + ' ' + TAHUN;
+    filename += '_' + BLN_FULL[parseInt(curBulan)-1] + '_' + TAHUN;
+  } else if (periode === 'semester') {
+    label = 'Semester ' + TAHUN;
+    filename += '_Semester_' + TAHUN;
+  } else {
+    label = 'Tahun ' + TAHUN;
+    filename += '_Tahunan_' + TAHUN;
+  }
+  filename += '.pdf';
   
   const container = document.createElement('div');
   container.innerHTML = `
     <div style="font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto">
-      <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1B5E20;padding-bottom:15px">
-        <h1 style="color:#1B5E20;margin:0;font-size:20px">📊 LAPORAN KEUANGAN</h1>
-        <h2 style="color:#1B5E20;margin:5px 0;font-size:16px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
+      <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid #1B5E20;padding-bottom:15px">
+        <h1 style="color:#1B5E20;margin:0;font-size:22px">📊 LAPORAN KEUANGAN</h1>
+        <h2 style="color:#1B5E20;margin:8px 0;font-size:16px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
         <p style="color:#666;margin:5px 0;font-size:12px">Ciputat Timur, Tangerang Selatan</p>
-        <p style="color:#1B5E20;margin:10px 0 0;font-size:14px;font-weight:700">${labelPeriode}</p>
+        <p style="color:#1B5E20;margin:10px 0 0;font-size:16px;font-weight:700">${label}</p>
       </div>
       ${laporanHTML}
-      <div style="margin-top:40px;display:flex;justify-content:space-between">
+      <div style="margin-top:50px;display:flex;justify-content:space-between;padding:0 20px">
         <div style="text-align:center">
-          <p style="margin:0;font-size:11px">Mengetahui,</p>
-          <p style="margin:0;font-weight:700;font-size:11px">Ketua RT 02</p>
-          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
+          <p style="margin:0;font-size:12px">Mengetahui,</p>
+          <p style="margin:0;font-weight:700;font-size:12px">Ketua RT 02</p>
+          <div style="margin-top:60px;border-top:1px solid #333;width:150px;display:inline-block"></div>
         </div>
         <div style="text-align:center">
-          <p style="margin:0;font-size:11px">Tangerang Selatan, ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
-          <p style="margin:0;font-weight:700;font-size:11px">Bendahara RT 02</p>
-          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
-          <p style="margin:5px 0 0;font-weight:700;font-size:11px">Andriyana</p>
+          <p style="margin:0;font-size:12px">Tgl, ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
+          <p style="margin:0;font-weight:700;font-size:12px">Bendahara RT 02</p>
+          <div style="margin-top:60px;border-top:1px solid #333;width:150px;display:inline-block"></div>
+          <p style="margin:8px 0 0;font-weight:700;font-size:12px">Andriyana</p>
         </div>
       </div>
     </div>
   `;
   
-  let filename = 'Laporan_Keuangan_RT02';
-  if (periode === 'bulanan') {
-    filename += '_' + BLN_FULL[bulanStart-1] + '_' + TAHUN;
-  } else if (periode === 'semester') {
-    filename += '_Semester_' + TAHUN;
-  } else {
-    filename += '_Tahunan_' + TAHUN;
-  }
-  filename += '.pdf';
+  toast('⏳ Membuat PDF...');
   
-  const opt = {
+  if (typeof html2pdf === 'undefined') {
+    toast('❌ Library PDF belum loaded. Refresh halaman dulu.');
+    return;
+  }
+  
+  html2pdf().set({
     margin: [10, 10, 10, 10],
     filename: filename,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-  
-  toast('⏳ Sedang membuat PDF...');
-  html2pdf().set(opt).from(container).save().then(() => {
-    toast('✅ PDF berhasil di-download!');
-    document.getElementById('pdf-preview-modal')?.remove();
-  }).catch(err => {
-    toast('❌ Gagal membuat PDF: ' + err.message);
+  }).from(container).save().then(function() {
+    toast('✅ PDF berhasil disimpan!');
+    var m = document.getElementById('pdfPreviewModal');
+    if (m) m.remove();
+  }).catch(function(err) {
+    toast('❌ Gagal: ' + err.message);
   });
-}
-
-function cetakLaporan(periode) {
-  let bulanStart = 1;
-  if (periode === 'bulanan') {
-    bulanStart = parseInt(document.getElementById('laporan-bulan-start').value);
-  }
-  
-  const laporanHTML = getLaporanHTML(periode, bulanStart);
-  
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Laporan Keuangan RT 02</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
-        th { background-color: #1B5E20; color: white; }
-        .nama-cell { text-align: left; }
-        .total-cell { font-weight: 700; background-color: #E8F5E9; }
-        .stat-card { display: inline-block; padding: 10px 15px; margin: 5px; border-radius: 8px; border: 1px solid #ddd; }
-        .stat-card .label { font-size: 11px; color: #666; }
-        .stat-card .amount { font-size: 16px; font-weight: 700; }
-        .income .amount { color: #2E7D32; }
-        .expense .amount { color: #DC3545; }
-        .info .amount { color: #17A2B8; }
-        .warning .amount { color: #F57F17; }
-        @media print { body { padding: 0; } }
-      </style>
-    </head>
-    <body>
-      <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1B5E20;padding-bottom:15px">
-        <h1 style="color:#1B5E20;margin:0;font-size:18px">📊 LAPORAN KEUANGAN</h1>
-        <h2 style="color:#1B5E20;margin:5px 0;font-size:14px">RT 02/RW 014 Perumahan Griya Satwika Telkom</h2>
-        <p style="color:#666;margin:5px 0;font-size:11px">Ciputat Timur, Tangerang Selatan</p>
-      </div>
-      ${laporanHTML}
-      <div style="margin-top:40px;display:flex;justify-content:space-between">
-        <div style="text-align:center">
-          <p style="margin:0;font-size:11px">Mengetahui,</p>
-          <p style="margin:0;font-weight:700;font-size:11px">Ketua RT 02</p>
-          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
-        </div>
-        <div style="text-align:center">
-          <p style="margin:0;font-size:11px">Tangerang Selatan, ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p>
-          <p style="margin:0;font-weight:700;font-size:11px">Bendahara RT 02</p>
-          <div style="margin-top:50px;border-top:1px solid #333;width:150px"></div>
-          <p style="margin:5px 0 0;font-weight:700;font-size:11px">Andriyana</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
-  setTimeout(() => { printWindow.print(); }, 500);
 }
 
 function renderLaporan(){
