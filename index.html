@@ -635,8 +635,10 @@ function saveDB(d){
   syncToSupabase(d);
 }
 
+let _syncing = false;
 async function syncToSupabase(data){
-  if(!SUPABASE_URL || !SUPABASE_KEY) return;
+  if(!SUPABASE_URL || !SUPABASE_KEY || _syncing) return;
+  _syncing = true;
   try {
     // Settings
     await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
@@ -659,6 +661,7 @@ async function syncToSupabase(data){
     }
     console.log('Supabase sync done: ' + wargaRows.length + ' warga, ' + txRows.length + ' transaksi');
   } catch(e) { console.log('Supabase sync error:', e.message); }
+  _syncing = false;
 }
 
 async function loadFromSupabase(){
