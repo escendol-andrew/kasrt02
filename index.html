@@ -663,32 +663,9 @@ function showTab(t){
 
 // ==================== DASHBOARD ====================
 let chartPie, chartBar, chartCashflow, chartTop, chartWargaPie, chartWargaBar;
-Chart.register(piePercentPlugin);
 
-// Custom plugin: draw percentage on doughnut charts
-const piePercentPlugin = {
-  id: 'piePercent',
-  afterDraw(chart) {
-    if (chart.config.type !== 'doughnut') return;
-    const {ctx, data} = chart;
-    const meta = chart.getDatasetMeta(0);
-    const total = data.datasets[0].data.reduce((a,b)=>a+b, 0);
-    if (!total) return;
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 13px sans-serif';
-    meta.data.forEach((arc, i) => {
-      const val = data.datasets[0].data[i];
-      const pct = Math.round(val / total * 100);
-      if (pct < 5) return;
-      const pos = arc.tooltipPosition();
-      ctx.fillText(pct + '%', pos.x, pos.y);
-    });
-    ctx.restore();
-  }
-};
+// Pie percent plugin - only draws on doughnut
+const piePercentPlugin={id:'piePercent',afterDraw(c){if(c.config.type!=='doughnut')return;const{ctx,data:d}=c;const m=c.getDatasetMeta(0);const t=d.datasets[0].data.reduce((a,b)=>a+b,0);if(!t)return;ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';m.data.forEach((a,i)=>{const v=d.datasets[0].data[i];const p=Math.round(v/t*100);if(p<5)return;const p2=a.tooltipPosition();ctx.fillText(p+'%',p2.x,p2.y)});ctx.restore()}};Chart.register(piePercentPlugin);
 
 function renderDashboard(){
   const isAdmin = currentUser && currentUser.role === 'admin';
