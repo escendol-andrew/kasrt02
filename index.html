@@ -349,6 +349,8 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
           </select>
           <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Cetak</button>
           <button class="btn btn-outline btn-sm admin-only" onclick="exportCSV()">📥 Export CSV</button>
+          <button class="btn btn-outline btn-sm admin-only" onclick="exportJSON()">📦 Backup Data</button>
+          <button class="btn btn-outline btn-sm admin-only" onclick="importJSON()">📤 Restore Data</button>
         </div>
         <div id="tabel-iuran"></div>
       </div>
@@ -1412,6 +1414,48 @@ function renderLaporan(){
 }
 
 // ==================== EXPORT ====================
+// ==================== BACKUP & RESTORE ====================
+function exportJSON(){
+  const data = JSON.stringify(DB, null, 2);
+  const blob = new Blob([data], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup_rt02_${TAHUN}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('📦 Backup berhasil di-download!');
+}
+
+function importJSON(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!confirm('Import akan menimpa semua data yang ada. Lanjutkan?')) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.warga || !Array.isArray(data.warga)) {
+          toast('❌ File tidak valid!');
+          return;
+        }
+        DB = data;
+        saveDB(DB);
+        toast('✅ Berhasil import ' + data.warga.length + ' warga!');
+        setTimeout(() => location.reload(), 500);
+      } catch(err) {
+        toast('❌ Error: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 function exportCSV(){
   let csv='No,Nama,Blok/No,Jan,Feb,Mar,Apr,Mei,Jun,Jul,Ags,Sep,Okt,Nov,Des,Total Bayar,Tunggakan\n';
   DB.warga.forEach((w,i)=>{
