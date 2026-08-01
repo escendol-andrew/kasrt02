@@ -661,15 +661,16 @@ async function saveDB(d){
 
 // Update satu warga ke Supabase
 async function updateWargaSupabase(warga){
-  if(!SUPABASE_URL || !SUPABASE_KEY) return;
+  if(!SUPABASE_URL || !SUPABASE_KEY) { toast('❌ Supabase tidak terkonfigurasi'); return; }
   try {
-    await supaFetch('/warga?no=eq.' + warga.no, {
+    const r = await supaFetch('/warga?no=eq.' + warga.no, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({bayar: warga.bayar || {}, kosong: warga.kosong || false})
     });
+    if(r.error) { toast('❌ Gagal simpan: ' + r.error.message); return; }
     console.log('☁️ Updated warga', warga.no);
-  } catch(e) { console.log('Update warga error:', e.message); }
+  } catch(e) { toast('❌ Error simpan: ' + e.message); }
 }
 
 // Update satu transaksi ke Supabase
