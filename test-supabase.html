@@ -1,45 +1,78 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Supabase Test</title></head>
-<body style="font-family:monospace;padding:20px">
-<h2>Supabase Connection Test</h2>
-<div id="log" style="white-space:pre;background:#111;color:#0f0;padding:15px;border-radius:8px"></div>
+<html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supabase Test</title></head>
+<body style="font-family:system-ui;padding:20px;background:#111;color:#eee">
+<h2>🔧 Supabase Connection Test</h2>
+<div id="log" style="white-space:pre-wrap;background:#000;padding:15px;border-radius:8px;font-size:13px;line-height:1.6;min-height:200px"></div>
+<br><button onclick="runTest()" style="padding:12px 24px;font-size:16px;background:#1B5E20;color:#fff;border:none;border-radius:8px">🔄 Run Test</button>
 <script>
 const URL = 'https://eokruhucldlysmgfaqep.supabase.co';
-const KEY = 'sb_publishable_t1I5nMkvaCDrmvVSveu_zw_MeNM1hEP';
+const KEY = 'sb_pub…1hEP';
 const log = document.getElementById('log');
-function add(msg) { log.textContent += msg + '\n'; }
+function add(msg, color) { 
+  const span = document.createElement('div');
+  span.textContent = msg;
+  if(color) span.style.color = color;
+  log.appendChild(span);
+}
 
-async function test() {
-  // Test 1: READ
-  add('1️⃣ Testing READ...');
+async function runTest() {
+  log.innerHTML = '';
+  
+  // Test 1: Check key
+  add('1️⃣ API Key: ' + KEY.substring(0,15) + '...');
+  
+  // Test 2: READ
+  add('2️⃣ READ warga...');
   try {
-    const r = await fetch(URL + '/rest/v1/warga?select=no,nama,bayar&no=eq.18', {
+    const r = await fetch(URL + '/rest/v1/warga?select=no,nama&limit=1', {
       headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
     });
-    const d = await r.json();
-    add('✅ READ OK: ' + JSON.stringify(d));
-  } catch(e) { add('❌ READ FAIL: ' + e.message); }
+    if(r.ok) {
+      const d = await r.json();
+      add('✅ READ OK: ' + JSON.stringify(d), '#4CAF50');
+    } else {
+      const err = await r.text();
+      add('❌ READ FAIL (' + r.status + '): ' + err, '#f44336');
+    }
+  } catch(e) { add('❌ READ ERROR: ' + e.message, '#f44336'); }
 
-  // Test 2: WRITE
-  add('\n2️⃣ Testing WRITE (PATCH warga no=3)...');
+  // Test 3: WRITE (PATCH)
+  add('3️⃣ WRITE (PATCH warga no=3)...');
   try {
     const r = await fetch(URL + '/rest/v1/warga?no=eq.3', {
       method: 'PATCH',
-      headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bayar: { "8": 1 } })
+      headers: { 
+        'apikey': KEY, 
+        'Authorization': 'Bearer ' + KEY, 
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ bayar: { "99": 1 } })
     });
-    add('✅ WRITE status: ' + r.status);
-  } catch(e) { add('❌ WRITE FAIL: ' + e.message); }
+    if(r.ok) {
+      const d = await r.json();
+      add('✅ WRITE OK: ' + JSON.stringify(d), '#4CAF50');
+    } else {
+      const err = await r.text();
+      add('❌ WRITE FAIL (' + r.status + '): ' + err, '#f44336');
+    }
+  } catch(e) { add('❌ WRITE ERROR: ' + e.message, '#f44336'); }
 
-  // Test 3: READ back
-  add('\n3️⃣ Verifying...');
+  // Test 4: Verify
+  add('4️⃣ VERIFY read back...');
   try {
-    const r = await fetch(URL + '/rest/v1/warga?select=no,nama,bayar&no=eq.3', {
+    const r = await fetch(URL + '/rest/v1/warga?select=no,bayar&no=eq.3', {
       headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
     });
     const d = await r.json();
-    add('✅ VERIFY: ' + JSON.stringify(d));
-  } catch(e) { add('❌ VERIFY FAIL: ' + e.message); }
+    if(d[0] && d[0].bayar && d[0].bayar['99'] === 1) {
+      add('✅ VERIFY OK: data persisted!', '#4CAF50');
+    } else {
+      add('❌ VERIFY FAIL: data NOT saved! Got: ' + JSON.stringify(d), '#f44336');
+    }
+  } catch(e) { add('❌ VERIFY ERROR: ' + e.message, '#f44336'); }
 
   // Revert
   await fetch(URL + '/rest/v1/warga?no=eq.3', {
@@ -47,8 +80,8 @@ async function test() {
     headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ bayar: {} })
   });
-  add('\n✅ Test selesai!');
+  
+  add('\n🏁 Test selesai! Screenshot halaman ini dan kirim ke Alya.');
 }
-test();
 </script>
 </body></html>
