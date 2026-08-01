@@ -635,18 +635,20 @@ try {
 
 // Load: Supabase SAJA
 async function initDB(){
+  const ss = document.getElementById('sync-status');
+  if(ss){ ss.textContent='⏳ Loading...'; ss.style.background='#FFC107'; ss.style.color='#000'; }
   try {
     const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
     const supaDB = await Promise.race([_loadFromSupabase(), timeout]);
     if(supaDB && supaDB.warga && supaDB.warga.length > 0){
       DB = supaDB;
       console.log('✅ Loaded from Supabase:', DB.warga.length, 'warga');
+      if(ss){ ss.textContent='☁️ '+DB.warga.length+' warga dari server'; ss.style.background='#28A745'; ss.style.color='#fff'; }
       return;
     }
-  } catch(e) { console.log('⚠️ Supabase error:', e.message); }
-  // Kalau Supabase gagal, pakai default (data kosong)
+  } catch(e) { console.log('⚠️ Supabase error:', e.message); if(ss){ ss.textContent='❌ '+e.message; ss.style.background='#DC3545'; ss.style.color='#fff'; } }
   DB = {_version:DB_VERSION, warga:WARGA_DEFAULT, transaksi:TRANSAKSI_DEFAULT};
-  console.log('📋 Loaded from defaults (Supabase unavailable)');
+  console.log('📋 Loaded from defaults');
 }
 
 // Simpan: Supabase SAJA
@@ -662,17 +664,27 @@ async function saveDB(d){
 
 // Update satu warga ke Supabase
 async function updateWargaSupabase(warga){
+  const debugEl = document.getElementById('sync-status');
   if(!SUPABASE_URL || !SUPABASE_KEY) { toast('❌ Supabase tidak terkonfigurasi'); return; }
   try {
+    if(debugEl) { debugEl.textContent = '⏳ Menyimpan...'; debugEl.style.background = '#FFC107'; debugEl.style.color = '#000'; }
     const r = await supaFetch('/warga?no=eq.' + warga.no, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({bayar: warga.bayar || {}, kosong: warga.kosong || false})
     });
-    if(r.error) { toast('❌ Gagal simpan: ' + r.error.message); return; }
+    if(r.error) { 
+      if(debugEl) { debugEl.textContent = '❌ Gagal: ' + r.error.message; debugEl.style.background = '#DC3545'; debugEl.style.color = '#fff'; }
+      toast('❌ Gagal simpan: ' + r.error.message); 
+      return; 
+    }
+    if(debugEl) { debugEl.textContent = '☁️ Tersimpan!'; debugEl.style.background = '#28A745'; debugEl.style.color = '#fff'; }
     toast('☁️ Data tersimpan di server');
-    console.log('☁️ Updated warga', warga.no);
-  } catch(e) { toast('❌ Error simpan: ' + e.message); }
+    console.log('☁️ Updated warga', warga.no, 'bayar:', JSON.stringify(warga.bayar));
+  } catch(e) { 
+    if(debugEl) { debugEl.textContent = '❌ Error: ' + e.message; debugEl.style.background = '#DC3545'; debugEl.style.color = '#fff'; }
+    toast('❌ Error simpan: ' + e.message); 
+  }
 }
 
 // Update satu transaksi ke Supabase
