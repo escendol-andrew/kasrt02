@@ -557,7 +557,7 @@ const WARGA_DEFAULT = [
   {no:15,nama:"Nama Penyewa blm terinfo",blok:"A6/26",bayar:{}},
   {no:16,nama:"Metta Dharma Saputra",blok:"A6/27",bayar:{1:1,2:1,3:1,4:1,5:1,6:1,7:1,8:1,9:1,10:1,11:1,12:1}},
   {no:17,nama:"R. Asep Setiawan/R.Adriana R",blok:"A6/28",bayar:{}},
-  {no:18,nama:"Irvan Finaldy",blok:"A7/01",bayar:{}},
+  {no:18,nama:"Irvan Finaldy",blok:"A7/01",bayar:{8:1}},
   {no:19,nama:"Yoseph Yusnaedi",blok:"A7/02",bayar:{}},
   {no:20,nama:"Fitra Azli",blok:"A7/03",bayar:{}},
   {no:21,nama:"Riyan Ahmadi",blok:"A7/04",bayar:{}},
@@ -620,7 +620,7 @@ async function supaFetch(path, opts = {}) {
 
 // ==================== STORAGE ====================
 const DB_KEY = 'rt_griya_satwika_v5';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 function loadDB(){
   try{
