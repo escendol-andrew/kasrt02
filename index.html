@@ -363,6 +363,8 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
           <button class="btn btn-outline btn-sm admin-only" onclick="exportCSV()">📥 Export CSV</button>
           <button class="btn btn-outline btn-sm admin-only" onclick="exportJSON()">📦 Backup Data</button>
           <button class="btn btn-outline btn-sm admin-only" onclick="importJSON()">📤 Restore Data</button>
+          <button class="btn btn-outline btn-sm admin-only" onclick="pushToSupabase()">☁️ Push ke Supabase</button>
+          <button class="btn btn-outline btn-sm admin-only" onclick="pullFromSupabase()">🔄 Pull dari Supabase</button>
         </div>
         <div id="tabel-iuran"></div>
       </div>
@@ -1810,6 +1812,39 @@ function renderLaporan(){
 
 
 // ==================== EXPORT ====================
+// ==================== SUPABASE SYNC ====================
+async function pushToSupabase(){
+  if(!SUPABASE_URL || !SUPABASE_KEY){ toast('⚠️ Supabase belum dikonfigurasi!'); return; }
+  if(!confirm('Push data dari browser ini ke Supabase? Data di Supabase akan ditimpa.')) return;
+  toast('☁️ Pushing ke Supabase...');
+  try {
+    await _syncToSupabase(DB);
+    toast('✅ Berhasil push ke Supabase!');
+  } catch(e) {
+    toast('❌ Gagal: ' + e.message);
+  }
+}
+
+async function pullFromSupabase(){
+  if(!SUPABASE_URL || !SUPABASE_KEY){ toast('⚠️ Supabase belum dikonfigurasi!'); return; }
+  if(!confirm('Pull data dari Supabase? Data di browser ini akan ditimpa.')) return;
+  toast('🔄 Pulling dari Supabase...');
+  try {
+    const supaDB = await _loadFromSupabase();
+    if(supaDB && supaDB.warga && supaDB.warga.length > 0){
+      DB = supaDB;
+      localStorage.setItem(DB_KEY, JSON.stringify(DB));
+      syncIuranKeJurnal();
+      renderDashboard(); renderTabel(); renderKeuangan(); renderLaporan();
+      toast('✅ Berhasil pull ' + supaDB.warga.length + ' warga dari Supabase!');
+    } else {
+      toast('⚠️ Data Supabase kosong!');
+    }
+  } catch(e) {
+    toast('❌ Gagal: ' + e.message);
+  }
+}
+
 // ==================== BACKUP & RESTORE ====================
 function exportJSON(){
   const data = JSON.stringify(DB, null, 2);
