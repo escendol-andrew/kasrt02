@@ -620,62 +620,38 @@ async function supaFetch(path, opts = {}) {
   } catch(e) { return { data: null, error: e }; }
 }
 
-// ==================== STORAGE (Supabase-first) ====================
+// ==================== STORAGE (Supabase ONLY) ====================
 const DB_KEY = 'rt_griya_satwika_v5';
 const DB_VERSION = 8;
 let DB = null;
 
-// Force clear old cache setiap update
+// Hapus semua data lama di localStorage
 try {
-  const cv = localStorage.getItem('rt_cache_ver');
-  const cvNow = 'v8_' + new Date().toISOString().slice(0,10);
-  if(cv !== cvNow){
-    localStorage.removeItem(DB_KEY);
-    localStorage.removeItem('rt_supabase_cfg'); // hapus config lama
-    localStorage.setItem('rt_cache_ver', cvNow);
-    console.log('🔄 Cache cleared');
-  }
+  localStorage.removeItem(DB_KEY);
+  localStorage.removeItem('rt_supabase_cfg');
+  localStorage.removeItem('rt_cache_ver');
 } catch(e){}
 
-// Load: Supabase (utama) → localStorage (backup) → default
-// TIDAK pernah sync localStorage → Supabase otomatis
+// Load: Supabase SAJA
 async function initDB(){
-  // 1) Coba dari Supabase dulu
-  if(SUPABASE_URL && SUPABASE_KEY){
-    try {
-      const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 8000));
-      const supaDB = await Promise.race([_loadFromSupabase(), timeout]);
-      if(supaDB && supaDB.warga && supaDB.warga.length > 0){
-        DB = supaDB;
-        localStorage.setItem(DB_KEY, JSON.stringify(DB));
-        console.log('✅ Loaded from Supabase:', DB.warga.length, 'warga');
-        return;
-      }
-    } catch(e) { console.log('⚠️ Supabase load failed:', e.message); }
-  }
-  // 2) Fallback: localStorage (TANPA sync ke Supabase)
   try {
-    const d = localStorage.getItem(DB_KEY);
-    if(d){
-      const p = JSON.parse(d);
-      if(p._version === DB_VERSION && p.warga && p.warga.length > 10){
-        DB = p;
-        console.log('📦 Loaded from localStorage (backup)');
-        return;
-      }
+    const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const supaDB = await Promise.race([_loadFromSupabase(), timeout]);
+    if(supaDB && supaDB.warga && supaDB.warga.length > 0){
+      DB = supaDB;
+      console.log('✅ Loaded from Supabase:', DB.warga.length, 'warga');
+      return;
     }
-  } catch(e){}
-  // 3) Fallback terakhir: default
+  } catch(e) { console.log('⚠️ Supabase error:', e.message); }
+  // Kalau Supabase gagal, pakai default (data kosong)
   DB = {_version:DB_VERSION, warga:WARGA_DEFAULT, transaksi:TRANSAKSI_DEFAULT};
-  console.log('📋 Loaded from defaults');
+  console.log('📋 Loaded from defaults (Supabase unavailable)');
 }
 
-// Simpan: update Supabase (per-field) + localStorage backup
+// Simpan: Supabase SAJA
 async function saveDB(d){
   d._version = DB_VERSION;
   DB = d;
-  localStorage.setItem(DB_KEY, JSON.stringify(d));
-  // Sync ke Supabase: settings
   if(SUPABASE_URL && SUPABASE_KEY){
     try {
       await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
@@ -683,7 +659,7 @@ async function saveDB(d){
   }
 }
 
-// Update satu warga saja ke Supabase (PATCH, bukan full sync)
+// Update satu warga ke Supabase
 async function updateWargaSupabase(warga){
   if(!SUPABASE_URL || !SUPABASE_KEY) return;
   try {
@@ -692,7 +668,7 @@ async function updateWargaSupabase(warga){
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({bayar: warga.bayar || {}, kosong: warga.kosong || false})
     });
-    console.log('☁️ Updated warga', warga.no, 'di Supabase');
+    console.log('☁️ Updated warga', warga.no);
   } catch(e) { console.log('Update warga error:', e.message); }
 }
 
@@ -744,32 +720,13 @@ function doLoginAdmin(){
   }
 }
 
-function saveSupabaseCfg(){
-  const url = document.getElementById('cfg-url').value.trim();
-  const key = document.getElementById('cfg-key').value.trim();
-  if(!url || !key) { toast('⚠️ Isi URL dan API Key dulu!'); return; }
-  localStorage.setItem('rt_supabase_cfg', JSON.stringify({url:url, key:key}));
-  toast('✅ Tersimpan! Refresh halaman...');
-  setTimeout(() => location.reload(), 800);
-}
+// Supabase config: hardcoded, tidak perlu UI
+function saveSupabaseCfg(){ toast('ℹ️ Supabase sudah dikonfigurasi'); }
 
-// Show supabase config status
+// Supabase config UI disabled
 (function(){
-  const cfg = localStorage.getItem('rt_supabase_cfg');
-  if(cfg) {
-    const c = JSON.parse(cfg);
-    const el = document.getElementById('supabase-config');
-    if(el) {
-      el.querySelector('input#cfg-url').value = c.url || '';
-      el.querySelector('input#cfg-key').value = c.key || '';
-      // Show warning if using secret key
-      if(c.key && c.key.startsWith('sb_secret')) {
-        el.style.background = '#FFEBEE';
-        el.querySelector('p').textContent = '⚠️ Ganti ke Publishable Key!';
-        el.querySelector('p').style.color = '#DC3545';
-      }
-    }
-  }
+  const el = document.getElementById('supabase-config');
+  if(el) el.style.display = 'none';
 })();
 
 function doLoginWarga(){
@@ -1909,7 +1866,7 @@ function importJSON(){
     if (!file) return;
     if (!confirm('Import akan menimpa semua data yang ada. Lanjutkan?')) return;
     const reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = async function(ev) {
       try {
         const data = JSON.parse(ev.target.result);
         if (!data.warga || !Array.isArray(data.warga)) {
@@ -1917,7 +1874,7 @@ function importJSON(){
           return;
         }
         DB = data;
-        saveDB(DB);
+        await pushToSupabase();
         toast('✅ Berhasil import ' + data.warga.length + ' warga!');
         setTimeout(() => location.reload(), 500);
       } catch(err) {
