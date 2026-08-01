@@ -235,6 +235,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
       <span>📍 Ciputat Timur, Tangerang Selatan</span>
       <span>💰 Iuran: Rp 200.000/bl (Kosong: Rp 100.000/bl)</span>
       <span id="info-role"></span>
+      <span id="sync-status" style="font-size:.75em;padding:2px 8px;border-radius:10px;margin-left:8px"></span>
     </div>
   </div>
 
@@ -669,6 +670,7 @@ async function updateWargaSupabase(warga){
       body: JSON.stringify({bayar: warga.bayar || {}, kosong: warga.kosong || false})
     });
     if(r.error) { toast('❌ Gagal simpan: ' + r.error.message); return; }
+    toast('☁️ Data tersimpan di server');
     console.log('☁️ Updated warga', warga.no);
   } catch(e) { toast('❌ Error simpan: ' + e.message); }
 }
@@ -755,8 +757,31 @@ async function enterApp(){
   document.getElementById('user-badge').textContent=isAdmin?'🔐 Admin':'👤 '+DB.warga[currentUser.idx].nama;
   document.getElementById('info-role').textContent=isAdmin?'🔓 Mode Admin (bisa edit)':'👁️ Mode Warga (lihat saja)';
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  
+  // Cek koneksi Supabase
+  checkSyncStatus();
+  
   syncIuranKeJurnal();
   showTab('dashboard');
+}
+
+async function checkSyncStatus(){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  try {
+    const r = await supaFetch('/warga?select=count', { headers: {'Prefer': 'count=exact'} });
+    if(r.error) {
+      el.textContent = '❌ Supabase Error';
+      el.style.background = '#DC3545'; el.style.color = '#fff';
+    } else {
+      el.textContent = '☁️ Terhubung (' + (r.data?.[0]?.count || '?') + ' warga)';
+      el.style.background = '#28A745'; el.style.color = '#fff';
+    }
+  } catch(e) {
+    el.textContent = '❌ Offline';
+    el.style.background = '#DC3545'; el.style.color = '#fff';
+  }
+  setTimeout(() => { if(el) el.style.opacity='0.6'; }, 5000);
 }
 
 // ==================== HELPERS ====================
