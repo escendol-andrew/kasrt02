@@ -622,8 +622,19 @@ async function supaFetch(path, opts = {}) {
 
 // ==================== STORAGE (Supabase-first) ====================
 const DB_KEY = 'rt_griya_satwika_v5';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 let DB = null;
+
+// Force clear old cache setiap update
+try {
+  const cv = localStorage.getItem('rt_cache_ver');
+  const cvNow = 'v8_' + new Date().toISOString().slice(0,10);
+  if(cv !== cvNow){
+    localStorage.removeItem(DB_KEY);
+    localStorage.setItem('rt_cache_ver', cvNow);
+    console.log('🔄 Cache cleared');
+  }
+} catch(e){}
 
 // Load: Supabase (utama) → localStorage (backup) → default
 // TIDAK pernah sync localStorage → Supabase otomatis
