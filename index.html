@@ -618,67 +618,88 @@ async function supaFetch(path, opts = {}) {
   } catch(e) { return { data: null, error: e }; }
 }
 
-// ==================== STORAGE ====================
+// ==================== STORAGE (Supabase-first) ====================
 const DB_KEY = 'rt_griya_satwika_v5';
 const DB_VERSION = 7;
+let DB = null;
 
-function loadDB(){
-  try{
-    const d=localStorage.getItem(DB_KEY);
-    if(d){const p=JSON.parse(d);if(p._version===DB_VERSION&&p.warga&&p.warga.length>10)return p}
-  }catch(e){}
-  return{_version:DB_VERSION,warga:WARGA_DEFAULT,transaksi:TRANSAKSI_DEFAULT};
+// Load: Supabase (utama) → localStorage (backup) → default
+async function initDB(){
+  // 1) Coba dari Supabase dulu
+  if(SUPABASE_URL && SUPABASE_KEY){
+    try {
+      const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+      const supaDB = await Promise.race([_loadFromSupabase(), timeout]);
+      if(supaDB && supaDB.warga && supaDB.warga.length > 0){
+        DB = supaDB;
+        localStorage.setItem(DB_KEY, JSON.stringify(DB));
+        console.log('✅ Loaded from Supabase:', DB.warga.length, 'warga');
+        return;
+      }
+    } catch(e) { console.log('⚠️ Supabase load failed:', e.message); }
+  }
+  // 2) Fallback: localStorage
+  try {
+    const d = localStorage.getItem(DB_KEY);
+    if(d){
+      const p = JSON.parse(d);
+      if(p._version === DB_VERSION && p.warga && p.warga.length > 10){
+        DB = p;
+        console.log('📦 Loaded from localStorage (backup)');
+        // Background sync ke Supabase biar data lokal nggak hilang
+        if(SUPABASE_URL && SUPABASE_KEY) _syncToSupabase(DB);
+        return;
+      }
+    }
+  } catch(e){}
+  // 3) Fallback terakhir: default
+  DB = {_version:DB_VERSION, warga:WARGA_DEFAULT, transaksi:TRANSAKSI_DEFAULT};
+  if(SUPABASE_URL && SUPABASE_KEY) _syncToSupabase(DB);
+  console.log('📋 Loaded from defaults');
 }
+
+// Simpan: localStorage langsung + sync ke Supabase
 function saveDB(d){
-  d._version=DB_VERSION;
-  localStorage.setItem(DB_KEY,JSON.stringify(d));
-  syncToSupabase(d);
+  d._version = DB_VERSION;
+  DB = d;
+  localStorage.setItem(DB_KEY, JSON.stringify(d));
+  _syncToSupabase(d);
+}
+
+async function _loadFromSupabase(){
+  const wr = await supaFetch('/warga?select=*&order=no.asc');
+  const tr = await supaFetch('/transaksi?select=*');
+  if(wr.error || !wr.data || wr.data.length === 0) return null;
+  return {
+    _version: DB_VERSION,
+    warga: wr.data.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false})),
+    transaksi: (tr.data||[]).map(t => ({id:t.uid,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}))
+  };
 }
 
 let _syncing = false;
-async function syncToSupabase(data){
+async function _syncToSupabase(data){
   if(!SUPABASE_URL || !SUPABASE_KEY || _syncing) return;
   _syncing = true;
   try {
-    // Settings
     await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
-    // Warga - delete all first, then insert
     await supaFetch('/warga?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
     const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
-    if(wargaRows.length > 0) {
-      for(let i=0; i<wargaRows.length; i+=20) {
-        let batch = wargaRows.slice(i, i+20);
-        let r = await supaFetch('/warga', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(batch) });
-        if(r.error) console.log('Insert warga error:', r.error.message);
-      }
+    for(let i=0; i<wargaRows.length; i+=20){
+      let batch = wargaRows.slice(i, i+20);
+      let r = await supaFetch('/warga', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(batch) });
+      if(r.error) console.log('Insert warga error:', r.error.message);
     }
-    // Transaksi
     await supaFetch('/transaksi?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
     const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
-    if(txRows.length > 0) {
+    if(txRows.length > 0){
       let r = await supaFetch('/transaksi', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(txRows) });
       if(r.error) console.log('Insert transaksi error:', r.error.message);
     }
-    console.log('Supabase sync done: ' + wargaRows.length + ' warga, ' + txRows.length + ' transaksi');
+    console.log('☁️ Synced to Supabase:', wargaRows.length, 'warga,', txRows.length, 'transaksi');
   } catch(e) { console.log('Supabase sync error:', e.message); }
   _syncing = false;
 }
-
-async function loadFromSupabase(){
-  if(!SUPABASE_URL || !SUPABASE_KEY) return null;
-  try {
-    const wr = await supaFetch('/warga?select=*&order=no.asc');
-    const tr = await supaFetch('/transaksi?select=*');
-    if(wr.error || !wr.data || wr.data.length === 0) return null;
-    return {
-      _version: DB_VERSION,
-      warga: wr.data.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false})),
-      transaksi: (tr.data||[]).map(t => ({id:t.uid,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}))
-    };
-  } catch(e) { console.log('Supabase load error:', e.message); return null; }
-}
-
-let DB = loadDB();
 
 // ==================== SESSION ====================
 let currentUser = null; // {role:'admin'} or {role:'warga', idx:28}
@@ -754,50 +775,15 @@ async function enterApp(){
   document.getElementById('login-page').style.display='none';
   document.getElementById('app').style.display='block';
 
-  // Show app immediately with local data (don't wait for Supabase)
+  // Pastikan DB sudah terisi (dari Supabase utama)
+  if(!DB) await initDB();
+
   const isAdmin=currentUser.role==='admin';
   document.getElementById('user-badge').textContent=isAdmin?'🔐 Admin':'👤 '+DB.warga[currentUser.idx].nama;
   document.getElementById('info-role').textContent=isAdmin?'🔓 Mode Admin (bisa edit)':'👁️ Mode Warga (lihat saja)';
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   syncIuranKeJurnal();
   showTab('dashboard');
-
-  // Sync Supabase in background (non-blocking)
-  if(SUPABASE_URL && SUPABASE_KEY) syncSupabaseBG();
-}
-
-async function syncSupabaseBG(){
-  const syncStatus = document.createElement('div');
-  syncStatus.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#1B5E20;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;z-index:9999;';
-  syncStatus.textContent = '☁️ Syncing...';
-  document.body.appendChild(syncStatus);
-
-  try {
-    const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
-    const supaDB = await Promise.race([loadFromSupabase(), timeout]);
-
-    if(supaDB && supaDB.warga && supaDB.warga.length > 0) {
-      DB = supaDB;
-      localStorage.setItem(DB_KEY, JSON.stringify(DB));
-      syncStatus.textContent = '☁️ ' + supaDB.warga.length + ' warga dari server';
-      syncStatus.style.background = '#28A745';
-      syncIuranKeJurnal();
-      renderDashboard(); renderTabel(); renderKeuangan(); renderLaporan();
-    } else if(DB.warga && DB.warga.length > 0) {
-      syncStatus.textContent = '☁️ Upload ke server...';
-      await syncToSupabase(DB);
-      syncStatus.textContent = '✅ Data diupload!';
-      syncStatus.style.background = '#28A745';
-    } else {
-      syncStatus.remove(); return;
-    }
-  } catch(e) {
-    syncStatus.textContent = '⚠️ Sync: ' + (e.message||'error');
-    syncStatus.style.background = '#FFC107';
-    syncStatus.style.color = '#000';
-    console.log('Supabase sync:', e);
-  }
-  setTimeout(() => syncStatus.remove(), 5000);
 }
 
 // ==================== HELPERS ====================
@@ -1880,7 +1866,10 @@ function exportCSV(){
 }
 
 // ==================== INIT ====================
-setRole('admin');
+(async function(){
+  await initDB();
+  setRole('admin');
+})();
 </script>
 </body>
 </html>
