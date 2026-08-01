@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Supabase Test</title></head>
+<body style="font-family:monospace;padding:20px">
+<h2>Supabase Connection Test</h2>
+<div id="log" style="white-space:pre;background:#111;color:#0f0;padding:15px;border-radius:8px"></div>
+<script>
+const URL = 'https://eokruhucldlysmgfaqep.supabase.co';
+const KEY = 'sb_publishable_t1I5nMkvaCDrmvVSveu_zw_MeNM1hEP';
+const log = document.getElementById('log');
+function add(msg) { log.textContent += msg + '\n'; }
+
+async function test() {
+  // Test 1: READ
+  add('1️⃣ Testing READ...');
+  try {
+    const r = await fetch(URL + '/rest/v1/warga?select=no,nama,bayar&no=eq.18', {
+      headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
+    });
+    const d = await r.json();
+    add('✅ READ OK: ' + JSON.stringify(d));
+  } catch(e) { add('❌ READ FAIL: ' + e.message); }
+
+  // Test 2: WRITE
+  add('\n2️⃣ Testing WRITE (PATCH warga no=3)...');
+  try {
+    const r = await fetch(URL + '/rest/v1/warga?no=eq.3', {
+      method: 'PATCH',
+      headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bayar: { "8": 1 } })
+    });
+    add('✅ WRITE status: ' + r.status);
+  } catch(e) { add('❌ WRITE FAIL: ' + e.message); }
+
+  // Test 3: READ back
+  add('\n3️⃣ Verifying...');
+  try {
+    const r = await fetch(URL + '/rest/v1/warga?select=no,nama,bayar&no=eq.3', {
+      headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
+    });
+    const d = await r.json();
+    add('✅ VERIFY: ' + JSON.stringify(d));
+  } catch(e) { add('❌ VERIFY FAIL: ' + e.message); }
+
+  // Revert
+  await fetch(URL + '/rest/v1/warga?no=eq.3', {
+    method: 'PATCH',
+    headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bayar: {} })
+  });
+  add('\n✅ Test selesai!');
+}
+test();
+</script>
+</body></html>
