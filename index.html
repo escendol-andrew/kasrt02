@@ -658,12 +658,14 @@ async function initDB(){
   console.log('📋 Loaded from defaults');
 }
 
-// Simpan: localStorage langsung + sync ke Supabase
-function saveDB(d){
+// Simpan: Supabase utama, localStorage backup
+async function saveDB(d){
   d._version = DB_VERSION;
   DB = d;
-  localStorage.setItem(DB_KEY, JSON.stringify(d));
-  _syncToSupabase(d);
+  localStorage.setItem(DB_KEY, JSON.stringify(d)); // backup dulu biar nggak hilang
+  if(SUPABASE_URL && SUPABASE_KEY){
+    await _syncToSupabase(d); // tunggu Supabase selesai
+  }
 }
 
 async function _loadFromSupabase(){
