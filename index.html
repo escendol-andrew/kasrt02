@@ -626,6 +626,7 @@ const DB_VERSION = 7;
 let DB = null;
 
 // Load: Supabase (utama) → localStorage (backup) → default
+// TIDAK pernah sync localStorage → Supabase otomatis
 async function initDB(){
   // 1) Coba dari Supabase dulu
   if(SUPABASE_URL && SUPABASE_KEY){
@@ -640,7 +641,7 @@ async function initDB(){
       }
     } catch(e) { console.log('⚠️ Supabase load failed:', e.message); }
   }
-  // 2) Fallback: localStorage
+  // 2) Fallback: localStorage (TANPA sync ke Supabase)
   try {
     const d = localStorage.getItem(DB_KEY);
     if(d){
@@ -648,61 +649,59 @@ async function initDB(){
       if(p._version === DB_VERSION && p.warga && p.warga.length > 10){
         DB = p;
         console.log('📦 Loaded from localStorage (backup)');
-        // Background sync ke Supabase biar data lokal nggak hilang
-        if(SUPABASE_URL && SUPABASE_KEY) _syncToSupabase(DB);
         return;
       }
     }
   } catch(e){}
   // 3) Fallback terakhir: default
   DB = {_version:DB_VERSION, warga:WARGA_DEFAULT, transaksi:TRANSAKSI_DEFAULT};
-  if(SUPABASE_URL && SUPABASE_KEY) _syncToSupabase(DB);
   console.log('📋 Loaded from defaults');
 }
 
-// Simpan: Supabase utama, localStorage backup
+// Simpan: update Supabase (per-field) + localStorage backup
 async function saveDB(d){
   d._version = DB_VERSION;
   DB = d;
-  localStorage.setItem(DB_KEY, JSON.stringify(d)); // backup dulu biar nggak hilang
+  localStorage.setItem(DB_KEY, JSON.stringify(d));
+  // Sync ke Supabase: settings
   if(SUPABASE_URL && SUPABASE_KEY){
-    await _syncToSupabase(d); // tunggu Supabase selesai
+    try {
+      await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
+    } catch(e) { console.log('Settings sync error:', e.message); }
   }
 }
 
-async function _loadFromSupabase(){
-  const wr = await supaFetch('/warga?select=*&order=no.asc');
-  const tr = await supaFetch('/transaksi?select=*');
-  if(wr.error || !wr.data || wr.data.length === 0) return null;
-  return {
-    _version: DB_VERSION,
-    warga: wr.data.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false})),
-    transaksi: (tr.data||[]).map(t => ({id:t.uid,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}))
-  };
+// Update satu warga saja ke Supabase (PATCH, bukan full sync)
+async function updateWargaSupabase(warga){
+  if(!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    await supaFetch('/warga?no=eq.' + warga.no, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({bayar: warga.bayar || {}, kosong: warga.kosong || false})
+    });
+    console.log('☁️ Updated warga', warga.no, 'di Supabase');
+  } catch(e) { console.log('Update warga error:', e.message); }
 }
 
-let _syncing = false;
-async function _syncToSupabase(data){
-  if(!SUPABASE_URL || !SUPABASE_KEY || _syncing) return;
-  _syncing = true;
+// Update satu transaksi ke Supabase
+async function updateTransaksiSupabase(tx){
+  if(!SUPABASE_URL || !SUPABASE_KEY) return;
   try {
-    await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
-    await supaFetch('/warga?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
-    const wargaRows = data.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
-    for(let i=0; i<wargaRows.length; i+=20){
-      let batch = wargaRows.slice(i, i+20);
-      let r = await supaFetch('/warga', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(batch) });
-      if(r.error) console.log('Insert warga error:', r.error.message);
-    }
-    await supaFetch('/transaksi?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
-    const txRows = data.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
-    if(txRows.length > 0){
-      let r = await supaFetch('/transaksi', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(txRows) });
-      if(r.error) console.log('Insert transaksi error:', r.error.message);
-    }
-    console.log('☁️ Synced to Supabase:', wargaRows.length, 'warga,', txRows.length, 'transaksi');
-  } catch(e) { console.log('Supabase sync error:', e.message); }
-  _syncing = false;
+    await supaFetch('/transaksi', {
+      method: 'POST',
+      headers: {'Prefer': 'resolution=merge-duplicates', 'Content-Type': 'application/json'},
+      body: JSON.stringify({uid:tx.id, jenis:tx.jenis, keterangan:tx.keterangan, jumlah:tx.jumlah, tanggal:tx.tanggal, ref:tx.ref, bulan:tx.bulan})
+    });
+  } catch(e) { console.log('Update transaksi error:', e.message); }
+}
+
+// Hapus satu transaksi dari Supabase
+async function deleteTransaksiSupabase(txId){
+  if(!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    await supaFetch('/transaksi?uid=eq.' + txId, { method: 'DELETE' });
+  } catch(e) { console.log('Delete transaksi error:', e.message); }
 }
 
 // ==================== SESSION ====================
@@ -1215,7 +1214,7 @@ function openEditBayar(idx){
   openModal('modal-edit-bayar');
 }
 
-function saveEditBayar(){
+async function saveEditBayar(){
   const idx=parseInt(document.getElementById('edit-bayar-idx').value);
   const w=DB.warga[idx];
   if(!w)return;
@@ -1242,6 +1241,7 @@ function saveEditBayar(){
   // Update jurnal untuk bulan yang berubah
   changedMonths.forEach(m=>updateJurnalBulan(m));
   
+  await updateWargaSupabase(w);
   saveDB(DB);
   closeModal('modal-edit-bayar');
   renderTabel();
@@ -1251,7 +1251,7 @@ function saveEditBayar(){
   toast(`✅ Data ${w.nama} diperbarui`);
 }
 
-function bayarIuran(){
+async function bayarIuran(){
   const idx=parseInt(document.getElementById('bayar-idx').value);
   const w=DB.warga[idx];
   if(!w)return;
@@ -1265,6 +1265,7 @@ function bayarIuran(){
   // Update jurnal per bulan yang berubah
   selectedMonths.forEach(m=>updateJurnalBulan(m));
   
+  await updateWargaSupabase(w);
   saveDB(DB);
   closeModal('modal-bayar');
   renderTabel();
@@ -1274,7 +1275,7 @@ function bayarIuran(){
   toast(`✅ Pembayaran ${w.nama} berhasil dicatat`);
 }
 
-function toggleBayar(idx,bulan){
+async function toggleBayar(idx,bulan){
   if(!currentUser||currentUser.role!=='admin')return;
   const w=DB.warga[idx];
   if(!w)return;
@@ -1289,6 +1290,7 @@ function toggleBayar(idx,bulan){
   }
   // Update jurnal bulan ini
   updateJurnalBulan(bulan);
+  await updateWargaSupabase(w);
   saveDB(DB);
   renderTabel();
   renderDashboard();
@@ -1312,7 +1314,7 @@ function updateJurnalBulan(bulan){
   }
 }
 
-function syncIuranKeJurnal(){
+async function syncIuranKeJurnal(){
   // Hapus semua transaksi iuran lama
   DB.transaksi=DB.transaksi.filter(t=>t.ref!=='iuran');
   // Hitung total iuran per bulan
@@ -1325,6 +1327,17 @@ function syncIuranKeJurnal(){
       const tgl=new Date(TAHUN,m-1,1).toISOString().slice(0,10);
       DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:`Iuran Warga ${BLN_FULL[m-1]} ${TAHUN}`,jumlah:totalBulan,tanggal:tgl,ref:'iuran',bulan:m});
     }
+  }
+  // Sync transaksi ke Supabase
+  if(SUPABASE_URL && SUPABASE_KEY){
+    try {
+      await supaFetch('/transaksi?ref=eq.iuran', { method:'DELETE' });
+      const iuranTx = DB.transaksi.filter(t=>t.ref==='iuran');
+      if(iuranTx.length>0){
+        const rows = iuranTx.map(t=>({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
+        await supaFetch('/transaksi', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates','Content-Type':'application/json'}, body:JSON.stringify(rows) });
+      }
+    } catch(e){ console.log('Sync iuran error:', e.message); }
   }
   saveDB(DB);
   renderKeuangan();
@@ -1420,22 +1433,26 @@ function renderJurnalUmum(){
   document.getElementById('tabel-keuangan').innerHTML=html;
 }
 
-function savePemasukan(){
+async function savePemasukan(){
   const k=document.getElementById('tx-masuk-keterangan').value.trim();
   const j=parseInt(document.getElementById('tx-masuk-jumlah').value);
   const t=document.getElementById('tx-masuk-tanggal').value;
   if(!k||!j||!t){toast('⚠️ Semua field wajib diisi!');return}
   DB.transaksi.push({id:uid(),jenis:'masuk',keterangan:k,jumlah:j,tanggal:t});
+  const tx=DB.transaksi[DB.transaksi.length-1];
+  await updateTransaksiSupabase(tx);
   saveDB(DB);closeModal('modal-transaksi-masuk');renderKeuangan();renderDashboard();renderLaporan();toast('✅ Pemasukan ditambahkan');
   document.getElementById('tx-masuk-keterangan').value='';document.getElementById('tx-masuk-jumlah').value='';document.getElementById('tx-masuk-tanggal').value='';
 }
 
-function savePengeluaran(){
+async function savePengeluaran(){
   const k=document.getElementById('tx-keluar-keterangan').value.trim();
   const j=parseInt(document.getElementById('tx-keluar-jumlah').value);
   const t=document.getElementById('tx-keluar-tanggal').value;
   if(!k||!j||!t){toast('⚠️ Semua field wajib diisi!');return}
   DB.transaksi.push({id:uid(),jenis:'keluar',keterangan:k,jumlah:j,tanggal:t});
+  const tx=DB.transaksi[DB.transaksi.length-1];
+  await updateTransaksiSupabase(tx);
   saveDB(DB);closeModal('modal-transaksi-keluar');renderKeuangan();renderDashboard();renderLaporan();toast('✅ Pengeluaran ditambahkan');
   document.getElementById('tx-keluar-keterangan').value='';document.getElementById('tx-keluar-jumlah').value='';document.getElementById('tx-keluar-tanggal').value='';
 }
@@ -1451,7 +1468,7 @@ function editTransaksi(id){
   openModal('modal-edit-tx');
 }
 
-function saveEditTransaksi(){
+async function saveEditTransaksi(){
   const id=document.getElementById('edit-tx-id').value;
   const idx=DB.transaksi.findIndex(t=>t.id===id);
   if(idx<0)return;
@@ -1461,15 +1478,17 @@ function saveEditTransaksi(){
   const tanggal=document.getElementById('edit-tx-tanggal').value;
   if(!keterangan||!jumlah||!tanggal){toast('⚠️ Semua field wajib diisi!');return}
   DB.transaksi[idx]={...DB.transaksi[idx],jenis,keterangan,jumlah,tanggal};
+  await updateTransaksiSupabase(DB.transaksi[idx]);
   saveDB(DB);
   closeModal('modal-edit-tx');
   renderKeuangan();renderDashboard();renderLaporan();
   toast('✅ Transaksi diperbarui');
 }
 
-function hapusTransaksi(id){
+async function hapusTransaksi(id){
   if(!confirm('Yakin hapus transaksi ini?'))return;
   DB.transaksi=DB.transaksi.filter(t=>t.id!==id);
+  await deleteTransaksiSupabase(id);
   saveDB(DB);renderKeuangan();renderDashboard();renderLaporan();toast('🗑️ Transaksi dihapus');
 }
 
@@ -1818,7 +1837,18 @@ async function pushToSupabase(){
   if(!confirm('Push data dari browser ini ke Supabase? Data di Supabase akan ditimpa.')) return;
   toast('☁️ Pushing ke Supabase...');
   try {
-    await _syncToSupabase(DB);
+    // Full sync: delete all, insert all
+    await supaFetch('/warga?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+    const wargaRows = DB.warga.map(w => ({no:w.no,nama:w.nama,blok:w.blok,bayar:w.bayar||{},kosong:w.kosong||false}));
+    for(let i=0; i<wargaRows.length; i+=20){
+      await supaFetch('/warga', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(wargaRows.slice(i,i+20)) });
+    }
+    await supaFetch('/transaksi?id=neq.0', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+    const txRows = DB.transaksi.map(t => ({uid:t.id,jenis:t.jenis,keterangan:t.keterangan,jumlah:t.jumlah,tanggal:t.tanggal,ref:t.ref,bulan:t.bulan}));
+    if(txRows.length > 0){
+      await supaFetch('/transaksi', { method:'POST', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(txRows) });
+    }
+    await supaFetch('/settings', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body:JSON.stringify([{key:'tahun',value:TAHUN},{key:'iuran_normal',value:IURAN},{key:'iuran_kosong',value:IURAN_KOSONG}]) });
     toast('✅ Berhasil push ke Supabase!');
   } catch(e) {
     toast('❌ Gagal: ' + e.message);
