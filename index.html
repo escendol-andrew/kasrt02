@@ -287,7 +287,7 @@ tfoot td{font-weight:700;background:#f8f9fa;border-top:2px solid var(--primary)}
           </div>
           <div class="chart-card">
             <h4>🏆 Top 10 Warga Bayar Terbanyak</h4>
-            <div class="chart-container"><canvas id="chart-top"></canvas></div>
+            <div class="chart-container" style="max-height:400px"><canvas id="chart-top"></canvas></div>
           </div>
         </div>
       </div>
@@ -1055,7 +1055,7 @@ function renderDashboardAdmin(){
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, max: 6, ticks: { stepSize: 1 } },
+        x: { beginAtZero: true, max: currentMonth, ticks: { stepSize: 1 } },
         y: { grid: { display: false }, ticks: { font: { size: 10 } } }
       }
     }
