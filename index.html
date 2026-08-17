@@ -940,8 +940,8 @@ function renderDashboardAdmin(){
   const pemasukanBulanan = [];
   const pengeluaranBulanan = [];
   for(let m=1;m<=12;m++){
-    const masuk = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
-    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    const masuk = DB.transaksi.filter(t=>t.jenis==='masuk'&&(t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t)=>s+t.jumlah,0);
+    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&(t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t)=>s+t.jumlah,0);
     pemasukanBulanan.push(masuk);
     pengeluaranBulanan.push(keluar);
   }
@@ -974,8 +974,8 @@ function renderDashboardAdmin(){
   const saldoBulanan = [];
   let saldoRunning = 0;
   for(let m=1;m<=12;m++){
-    const masuk = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
-    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    const masuk = DB.transaksi.filter(t=>t.jenis==='masuk'&&(t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t)=>s+t.jumlah,0);
+    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&(t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t)=>s+t.jumlah,0);
     saldoRunning += masuk - keluar;
     saldoBulanan.push(saldoRunning);
   }
@@ -1131,8 +1131,8 @@ function renderDashboardWarga(){
   const pengeluaranBulanan = [];
   for(let m=1;m<=12;m++){
     const iuran = DB.warga.filter((w,i)=>isPaid(i,m)).reduce((s,w)=>s+getIuran(w,m),0);
-    const masukLain = DB.transaksi.filter(t=>t.jenis==='masuk'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
-    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&new Date(t.tanggal).getMonth()+1===m).reduce((s,t)=>s+t.jumlah,0);
+    const masukLain = DB.transaksi.filter(t=>t.jenis==='masuk'&&(t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t)=>s+t.jumlah,0);
+    const keluar = DB.transaksi.filter(t=>t.jenis==='keluar'&&(t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t)=>s+t.jumlah,0);
     pemasukanBulanan.push(iuran + masukLain);
     pengeluaranBulanan.push(keluar);
   }
@@ -1674,10 +1674,10 @@ function renderLaporan(){
 
   months.forEach(m => {
     // Iuran from journal (ref='iuran')
-    const iuran = DB.transaksi.filter(t => t.jenis==='masuk' && t.ref==='iuran' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+    const iuran = DB.transaksi.filter(t => t.jenis==='masuk' && t.ref==='iuran' && (t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t) => s+t.jumlah, 0);
     // Other income (not iuran)
-    const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && t.ref!=='iuran' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
-    const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+    const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && t.ref!=='iuran' && (t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t) => s+t.jumlah, 0);
+    const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && (t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t) => s+t.jumlah, 0);
     totalIuran += iuran;
     totalMasukLain += masuk;
     totalKeluar += keluar;
@@ -1716,8 +1716,8 @@ function renderLaporan(){
   const bulanSebelum = months[0] - 1;
   if(bulanSebelum > 0) {
     for(let m=1; m<bulanSebelum; m++) {
-      const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
-      const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && new Date(t.tanggal).getMonth()+1===m).reduce((s,t) => s+t.jumlah, 0);
+      const masuk = DB.transaksi.filter(t => t.jenis==='masuk' && (t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t) => s+t.jumlah, 0);
+      const keluar = DB.transaksi.filter(t => t.jenis==='keluar' && (t.bulan||new Date(t.tanggal).getMonth()+1)===m).reduce((s,t) => s+t.jumlah, 0);
       saldoAwal += masuk - keluar;
     }
   }
