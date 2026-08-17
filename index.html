@@ -873,7 +873,7 @@ function renderDashboardAdmin(){
   const totalAktif = totalWarga - totalKosong;
   const sudahBayar = DB.warga.filter((w,i)=>getTotalBayar(i)>0&&!w.kosong).length;
   const belumBayar = totalAktif - sudahBayar;
-  const lunas = DB.warga.filter((w,i)=>getTotalBayar(i)>=6&&!w.kosong).length;
+  const now = new Date(); const currentMonth = now.getMonth()+1; const lunas = DB.warga.filter((w,i)=>getTotalBayar(i)>=currentMonth&&!w.kosong).length;
   const belumLunas = sudahBayar - lunas;
 
   const totalMasuk = DB.transaksi.filter(t=>t.jenis==='masuk').reduce((s,t)=>s+t.jumlah,0);
@@ -894,7 +894,7 @@ function renderDashboardAdmin(){
   chartPie = new Chart(pieCtx, {
     type: 'doughnut',
     data: {
-      labels: ['Lunas', 'Bayar Sebagian', 'Belum Bayar', 'Rumah Kosong'],
+      labels: ['Lunas (≥'+currentMonth+' bulan)', 'Bayar Sebagian (1-'+(currentMonth-1)+' bulan)', 'Belum Bayar', 'Rumah Kosong'],
       datasets: [{
         data: [lunas, belumLunas, belumBayar, totalKosong],
         backgroundColor: ['#28A745', '#FFC107', '#DC3545', '#adb5bd'],
